@@ -1,0 +1,32 @@
+# Core
+fastapi>=0.115.0
+uvicorn[standard]>=0.30.0
+python-dotenv>=1.0.1
+pydantic>=2.8.0
+pydantic-settings>=2.4.0
+
+# Browser automation (includes its own agent loop + LLM integration)
+browser-use==0.12.9
+playwright==1.47.0
+
+# LLM
+langchain-anthropic
+google-genai
+
+# Background tasks / monitoring
+apscheduler>=3.10.0
+
+# Resume parsing
+pdfplumber>=0.11.0
+pymupdf>=1.24.0
+
+# Database
+sqlalchemy>=2.0.0
+aiosqlite>=0.21.0
+
+# Frontend
+chainlit>=2.11.1
+
+# Utilities
+httpx>=0.27.0
+python-multipart>=0.0.12
