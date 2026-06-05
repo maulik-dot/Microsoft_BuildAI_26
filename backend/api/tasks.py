@@ -185,6 +185,76 @@ async def start_hackathon(request: dict, background_tasks: BackgroundTasks):
 
 # --- Memory + status endpoints ---
 
+@router.get("/models")
+async def get_model_status():
+    """
+    Live-check quota status for all configured models.
+    Returns availability, tier, daily limit, and usage from evals.
+    """
+    import httpx
+    from backend.config import settings
+    from backend.tools.model_selector import SMALL_MODELS, LARGE_MODELS, TASK_TIER_MAP, _load_evals
+
+    key = settings.google_api_key
+    evals = _load_evals()
+
+    all_models = {
+        "gemini-3.1-flash-lite": {"limit": 500,  "tier": "small"},
+        "gemini-flash-lite-latest": {"limit": 500,  "tier": "small"},
+        "gemini-2.0-flash-lite":    {"limit": 500,  "tier": "small"},
+        "gemini-2.5-flash":         {"limit": 20,   "tier": "large"},
+        "gemini-3.5-flash":         {"limit": 20,   "tier": "large"},
+        "gemini-2.0-flash":         {"limit": 200,  "tier": "large"},
+        "gemini-3.1-flash-image":   {"limit": 20,   "tier": "large"},
+    }
+
+    results = []
+    for model, meta in all_models.items():
+        status = "unknown"
+        try:
+            r = httpx.post(
+                f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={key}",
+                json={"contents": [{"parts": [{"text": "hi"}]}]},
+                timeout=5,
+            )
+            d = r.json()
+            if "candidates" in d:
+                status = "available"
+            elif d.get("error", {}).get("code") == 429:
+                status = "exhausted"
+            elif d.get("error", {}).get("code") == 404:
+                status = "not_found"
+            else:
+                status = "error"
+        except Exception:
+            status = "unreachable"
+
+        # Get usage from eval tracker
+        eval_runs = 0
+        for k, v in evals.items():
+            if model in k:
+                eval_runs += v.get("runs", 0)
+
+        results.append({
+            "model": model,
+            "tier": meta["tier"],
+            "daily_limit": meta["limit"],
+            "status": status,
+            "eval_runs": eval_runs,
+            "is_primary": (
+                model == SMALL_MODELS[0] and meta["tier"] == "small"
+            ) or (
+                model == LARGE_MODELS[0] and meta["tier"] == "large"
+            ),
+        })
+
+    return {
+        "models": results,
+        "quota_resets": "midnight UTC (~5:30 AM IST)",
+        "key_hint": f"...{key[-6:]}" if key else "not set",
+    }
+
+
 @router.get("/knowledge")
 async def get_knowledge():
     """Full web knowledge base — sites, navigation hints, search patterns, shortcuts."""
