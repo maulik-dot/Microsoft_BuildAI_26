@@ -69,12 +69,12 @@ async def run_research(query: str, task_id: str = "") -> dict:
         task = _build_task(refined_query, memory_ctx, current_plan, scratchpad, success_condition)
 
         # Fewer steps on retries — more focused
-        max_steps = 40 if attempt == 0 else 20
+        max_steps = 20 if attempt == 0 else 12
 
         # ── 4. BROWSER EXECUTION ──────────────────────────────────────────
         browser_model = get_model_for_tier(ModelTier.LARGE)
         t_start = time.time()
-        result = await run_deep_task(task, task_type="research", max_steps=max_steps)
+        result = await run_deep_task(task, task_type="research", task_id=task_id, max_steps=max_steps)
         latency_ms = int((time.time() - t_start) * 1000)
 
         # ── 5. VERIFICATION ───────────────────────────────────────────────

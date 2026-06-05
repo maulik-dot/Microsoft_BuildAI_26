@@ -49,7 +49,8 @@ async def start_research(request: ResearchRequest, background_tasks: BackgroundT
     async def run():
         _update(task_id, status="running")
         try:
-            result = await run_research(request.query, task_id=task_id)
+            from backend.tools.task_router import route
+            result = await route(request.query, task_id=task_id)
             if result.get("status") == "waiting_user":
                 _update(task_id,
                     status="waiting_user",

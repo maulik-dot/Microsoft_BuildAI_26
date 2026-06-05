@@ -4,7 +4,7 @@ from backend.models.schemas import TravelRequest
 from backend.memory.agent_memory import update
 
 
-async def run_travel_booking(request: TravelRequest, step_callback=None) -> dict:
+async def run_travel_booking(request: TravelRequest, step_callback=None, task_id: str = "") -> dict:
     budget_str = f"under ₹{int(request.budget)}" if request.budget else "best value"
     nights = f", check-out {request.return_date}" if request.return_date else ""
 
@@ -13,7 +13,9 @@ async def run_travel_booking(request: TravelRequest, step_callback=None) -> dict
         "travel"
     )
 
-    task = plan + f"""Find the best travel options for this trip:
+    task = plan + f"""⚠️ IMPORTANT: Do NOT use Google Flights or MakeMyTrip. Go directly to ixigo.com — it loads faster and has less bot detection.
+
+Find the best travel options for this trip:
 - From: {request.from_city} → To: {request.to_city}
 - Departure: {request.departure_date} | Return: {request.return_date or 'one-way'}
 - Budget: {budget_str}
@@ -45,7 +47,7 @@ RECOMMENDED COMBO: [cheapest flight] + [best value hotel]
 TOTAL COST: ₹X
 SAVINGS TIP: [any cheaper alternatives or date tips found]"""
 
-    result = await run_deep_task(task, task_type="travel", max_steps=40)
+    result = await run_deep_task(task, task_type="travel", task_id=task_id, max_steps=25)
     update("travel", result, success=bool(result))
     return {
         "summary": result,
