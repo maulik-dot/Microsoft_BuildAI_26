@@ -310,7 +310,7 @@
     <span>Online</span>
   </div>
   <div class="header-btns">
-    <button class="btn-icon" onclick="window.location.reload()" title="New chat">✕</button>
+    <button class="btn-icon" onclick="newChat()" title="New chat">✕</button>
   </div>
 </header>
 
@@ -373,6 +373,9 @@ const API = 'http://localhost:8000';
 marked.setOptions({ gfm: true, breaks: true });
 
 let busy = false, resumeProfile = null, clarifyTaskId = null;
+// Conversation history — last 10 turns sent with every query for context
+let chatHistory = [];  // [{role: "user"|"agent", content: "..."}]
+const MAX_HISTORY = 10;
 let thinkingEl = null, stepLogEl = null, stepPollInterval = null;
 
 // ── RESIZE ────────────────────────────────────────────────────────────────
@@ -395,11 +398,15 @@ async function send() {
 
   const query = resumeProfile ? `${q}\n\nMy profile: ${resumeProfile}` : q;
 
+  // Add user message to history
+  chatHistory.push({role: "user", content: q});
+  if (chatHistory.length > MAX_HISTORY) chatHistory = chatHistory.slice(-MAX_HISTORY);
+
   try {
     const r = await fetch(`${API}/tasks/research`, {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({query})
+      body: JSON.stringify({query, context: chatHistory.slice(0, -1)}) // exclude current msg
     });
     const task = await r.json();
     startThinking(task.task_id);
@@ -517,7 +524,11 @@ async function poll(taskId) {
       stopThinking();
       const result = task.result || {};
       const text = result.result || result.summary || '';
-      addAgentMsg(text || 'Task completed — but no result was returned. Try rephrasing your query.');
+      const displayText = text || 'Task completed — but no result was returned. Try rephrasing your query.';
+      addAgentMsg(displayText);
+      // Save agent reply to history (trimmed to avoid huge context)
+      chatHistory.push({role: "agent", content: displayText.slice(0, 600)});
+      if (chatHistory.length > MAX_HISTORY) chatHistory = chatHistory.slice(-MAX_HISTORY);
       setBusy(false);
       return;
     }
@@ -648,6 +659,11 @@ function copyMsg(btn) {
   navigator.clipboard.writeText(content?.innerText || '');
   btn.textContent = '✓ Copied';
   setTimeout(() => btn.textContent = '📋 Copy', 1500);
+}
+
+function newChat() {
+  chatHistory = [];
+  window.location.reload();
 }
 
 function useSugg(card) {

@@ -11,6 +11,7 @@ task_store: dict = {}
 
 class ResearchRequest(BaseModel):
     query: str
+    context: list[dict] = []  # [{role: "user"|"agent", content: "..."}]
 
 
 class AnswerRequest(BaseModel):
@@ -50,7 +51,9 @@ async def start_research(request: ResearchRequest, background_tasks: BackgroundT
         _update(task_id, status="running")
         try:
             from backend.tools.task_router import route
-            result = await route(request.query, task_id=task_id)
+            from backend.tools.context_resolver import resolve_query
+            resolved_query = resolve_query(request.query, request.context)
+            result = await route(resolved_query, task_id=task_id)
             if result.get("status") == "waiting_user":
                 _update(task_id,
                     status="waiting_user",
