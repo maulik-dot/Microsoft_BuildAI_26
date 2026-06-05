@@ -89,9 +89,11 @@
   /* ── HEADER ── */
   header {
     position: relative; z-index: 10; flex-shrink: 0;
-    display: flex; align-items: center; justify-content: space-between;
-    padding: 0 28px;
-    height: 52px;
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    padding: 0 20px;
+    height: 54px;
     background: rgba(6,6,15,0.92);
     backdrop-filter: blur(24px);
     border-bottom: 1px solid var(--border);
@@ -107,23 +109,19 @@
   }
 
   .logo {
-    display: flex; align-items: center; gap: 11px;
+    display: flex; align-items: center; gap: 10px;
+    justify-self: start;
   }
 
-  .logo-icon {
-    width: 28px; height: 28px; border-radius: var(--r-sm); flex-shrink: 0;
-    background: var(--blue-dim);
-    border: 1px solid rgba(59,130,246,0.3);
-    display: flex; align-items: center; justify-content: center;
-    font-size: 14px;
-    position: relative;
-    overflow: hidden;
+  .logo-img {
+    width: 36px; height: 36px;
+    object-fit: contain; flex-shrink: 0;
+    filter: drop-shadow(0 0 8px rgba(59,130,246,0.4));
+    transition: filter 0.3s ease;
   }
 
-  .logo-icon::after {
-    content: '';
-    position: absolute; inset: 0;
-    background: linear-gradient(135deg, rgba(59,130,246,0.2), transparent);
+  .logo-img:hover {
+    filter: drop-shadow(0 0 14px rgba(59,130,246,0.7));
   }
 
   .logo-text-wrap { display: flex; flex-direction: column; gap: 1px; }
@@ -148,6 +146,7 @@
     background: rgba(34,197,94,0.06);
     border: 1px solid rgba(34,197,94,0.12);
     padding: 4px 10px; border-radius: 20px;
+    justify-self: center;
   }
 
   .status-dot {
@@ -159,7 +158,7 @@
 
   @keyframes pulse { 0%,100%{opacity:1; transform:scale(1)} 50%{opacity:.4; transform:scale(.8)} }
 
-  .header-btns { display: flex; gap: 6px; }
+  .header-btns { display: flex; gap: 6px; justify-self: end; }
 
   .btn-icon {
     width: 28px; height: 28px; border-radius: var(--r-sm);
@@ -726,10 +725,10 @@
 
 <header>
   <div class="logo">
-    <div class="logo-icon">⬡</div>
+    <img src="/static/logo.png" alt="Agentic Web" class="logo-img">
     <div class="logo-text-wrap">
       <div class="logo-name">Agentic<span>Web</span></div>
-      <div class="logo-tag">autonomous · web · agent</div>
+      <div class="logo-tag">🐘 · 🐦‍⬛ · 🐙 &nbsp; autonomous research agent</div>
     </div>
   </div>
   <div class="header-status">
@@ -746,9 +745,12 @@
   <div id="chat">
     <div class="chat-inner" id="ci">
       <div id="empty-state">
-        <div class="empty-orb">⬡</div>
+        <div class="empty-orb"><img src="/static/logo.png" style="width:40px;height:40px;object-fit:contain;filter:drop-shadow(0 0 10px rgba(59,130,246,0.5))"></div>
         <div class="empty-title">What do you want to research?</div>
-        <div class="empty-sub">I browse the web autonomously — search, compare, extract, and synthesise. Just ask anything.</div>
+        <div class="empty-sub">
+          The 🐘 remembers everything. The 🐦‍⬛ sees the whole web. The 🐙 reaches anywhere.<br>
+          Just ask — I'll find it.
+        </div>
         <div class="suggestions">
           <div class="sugg" onclick="useSugg(this)">
             <span class="sugg-icon">✈️</span>
@@ -991,7 +993,7 @@ function startThinking(taskId) {
   wrap.className = 'msg agent';
   wrap.id = 'thinking-wrap';
   wrap.innerHTML = `
-    <div class="msg-meta"><div class="avatar">🌐</div><span>Agentic Web</span></div>
+    <div class="msg-meta"><div class="avatar">🐙</div><span>Agentic Web</span></div>
     <div class="thinking-wrap">
       <div class="thinking-bubble">
         <div class="globe">
@@ -999,10 +1001,10 @@ function startThinking(taskId) {
         </div>
         <div class="thinking-info">
           <div class="thinking-status">
-            Browsing the web
+            🐦‍⬛ Scanning the web
             <div class="dots"><span></span><span></span><span></span></div>
           </div>
-          <div class="thinking-url" id="thinking-url">Initialising agent…</div>
+          <div class="thinking-url" id="thinking-url">🐘 Remembering past runs…</div>
         </div>
       </div>
       <div class="step-log" id="step-log" style="display:none"></div>
@@ -1026,7 +1028,7 @@ function startThinking(taskId) {
         const urlEl = document.getElementById('thinking-url');
         const last = steps[steps.length - 1];
         if (urlEl && last) {
-          urlEl.textContent = last.url ? stripUrl(last.url) : (last.detail || 'searching…');
+          urlEl.textContent = last.url ? '🐦‍⬛ ' + stripUrl(last.url) : (last.detail || '🐙 reaching out…');
         }
       }
     } catch {}
@@ -1114,7 +1116,7 @@ function addClarify(taskId, question) {
   const el = document.createElement('div');
   el.className = 'msg agent'; el.id = 'clarify-el';
   el.innerHTML = `
-    <div class="msg-meta"><div class="avatar">🌐</div><span>Agentic Web</span></div>
+    <div class="msg-meta"><div class="avatar">🐙</div><span>Agentic Web</span></div>
     <div class="clarify-bubble">
       <div class="clarify-hdr">❓ One quick clarification</div>
       <div class="clarify-q">${esc(question)}</div>
@@ -1195,7 +1197,7 @@ function addAgentMsg(md) {
   const el = document.createElement('div');
   el.className = 'msg agent';
   el.innerHTML = `
-    <div class="msg-meta"><div class="avatar">🌐</div><span>Agentic Web</span><span style="margin-left:auto;color:var(--text3)">${ts()}</span></div>
+    <div class="msg-meta"><div class="avatar">🐙</div><span>Agentic Web</span><span style="margin-left:auto;color:var(--text3)">${ts()}</span></div>
     <div class="bubble"><div class="md-content">${marked.parse(md||'')}</div></div>
     <div class="msg-actions">
       <button class="act-btn" onclick="copyMsg(this)">📋 Copy</button>
@@ -1207,7 +1209,7 @@ function addErrorMsg(msg) {
   const el = document.createElement('div');
   el.className = 'msg agent';
   el.innerHTML = `
-    <div class="msg-meta"><div class="avatar">🌐</div><span>Agentic Web</span></div>
+    <div class="msg-meta"><div class="avatar">🐙</div><span>Agentic Web</span></div>
     <div class="bubble" style="border-color:rgba(239,68,68,.3);background:rgba(239,68,68,.05)">
       <strong style="color:var(--red)">Something went wrong</strong><br>
       <span style="color:var(--text2)">${esc(msg)}</span>

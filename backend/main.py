@@ -7,6 +7,9 @@ _groq_chat.ToolCallingModels.extend([
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
+import os
 from contextlib import asynccontextmanager
 from backend.api.tasks import router as tasks_router
 from backend.monitoring.scheduler import start_scheduler, stop_scheduler
@@ -36,6 +39,14 @@ app.add_middleware(
 )
 
 app.include_router(tasks_router)
+
+# Serve frontend static files (logo, etc.)
+FRONTEND_DIR = os.path.join(os.path.dirname(__file__), "../frontend")
+app.mount("/static", StaticFiles(directory=FRONTEND_DIR), name="static")
+
+@app.get("/")
+async def serve_ui():
+    return FileResponse(os.path.join(FRONTEND_DIR, "index.html"))
 
 
 @app.get("/health")
