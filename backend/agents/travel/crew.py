@@ -13,9 +13,7 @@ async def run_travel_booking(request: TravelRequest, step_callback=None, task_id
         "travel"
     )
 
-    task = plan + f"""⚠️ IMPORTANT: Do NOT use Google Flights or MakeMyTrip. Go directly to ixigo.com — it loads faster and has less bot detection.
-
-Find the best travel options for this trip:
+    task = plan + f"""Find the best travel options for this trip:
 - From: {request.from_city} → To: {request.to_city}
 - Departure: {request.departure_date} | Return: {request.return_date or 'one-way'}
 - Budget: {budget_str}

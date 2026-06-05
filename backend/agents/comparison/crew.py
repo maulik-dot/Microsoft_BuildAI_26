@@ -1,136 +1,133 @@
 """
-Universal Comparison Agent — hybrid approach:
+Universal Comparison Agent — fully self-learning, zero hardcoded sites.
 
-1. Start with KNOWN reliable sites from agent memory (fast, no wasted steps)
-2. Use Google to discover ONE additional source to cross-check
-3. Skip any site marked blocked in memory
-4. Return comparison table across sources that actually worked
+The agent discovers sources via Google, tries them, remembers what worked
+and what failed. Every run makes it smarter. No human-curated lists.
 
-Why hybrid: Pure Google-discovery fails for flights because all top results
-(Google Flights, MakeMyTrip, Skyscanner) have heavy bot protection.
-Starting with memory-confirmed working sites guarantees at least one result.
+Learning loop:
+1. Read memory → know which sites worked before for similar queries
+2. Search Google → discover fresh sources for this specific query
+3. Try sources → record success/failure in memory after each attempt
+4. Next run → memory already knows, agent is faster and smarter
 """
 
 from backend.tools.browser import run_deep_task
 from backend.tools.planner import _call_llm
-from backend.memory.agent_memory import get_general_context, update_general, _load as load_memory
+from backend.memory.agent_memory import (
+    get_general_context, update_general,
+    _load_general, _save_general
+)
 
 
-# Sites confirmed to work reliably for each category
-RELIABLE_SITES = {
-    "flights":   ["ixigo.com/flights", "goibibo.com"],
-    "hotels":    ["ixigo.com/hotels", "goibibo.com/hotels"],
-    "products":  ["flipkart.com", "amazon.in"],
-    "laptops":   ["flipkart.com", "amazon.in", "croma.com"],
-    "phones":    ["flipkart.com", "amazon.in"],
-    "courses":   ["udemy.com", "youtube.com"],
-    "jobs":      ["naukri.com", "indeed.co.in"],
-    "default":   ["flipkart.com", "amazon.in"],
-}
+def _record_site_outcome(domain: str, worked: bool):
+    """Update general memory with site experience."""
+    data = _load_general()
+    sources = data.setdefault("successful_sources", {})
+    blocked = data.setdefault("blocked_sites", [])
 
-# Sites with aggressive bot detection — skip immediately
-BLOCKED_SITES = [
-    "google.com/flights", "flights.google.com",
-    "makemytrip.com", "skyscanner.com", "kayak.com",
-    "booking.com", "expedia.com",
-]
+    if worked:
+        sources[domain] = sources.get(domain, 0) + 1
+        if domain in blocked:
+            blocked.remove(domain)
+    else:
+        if domain not in blocked:
+            blocked.append(domain)
+        sources.pop(domain, None)
+
+    _save_general(data)
 
 
-def _get_category(query: str) -> str:
-    """Detect which product/service category this query belongs to."""
-    q = query.lower()
-    if any(w in q for w in ["flight", "fly", "airline", "airfare"]): return "flights"
-    if any(w in q for w in ["hotel", "stay", "accommodation", "room"]): return "hotels"
-    if any(w in q for w in ["laptop", "notebook", "macbook", "chromebook"]): return "laptops"
-    if any(w in q for w in ["phone", "mobile", "iphone", "samsung", "smartphone"]): return "phones"
-    if any(w in q for w in ["course", "tutorial", "learn", "training", "udemy"]): return "courses"
-    if any(w in q for w in ["job", "career", "salary", "hiring"]): return "jobs"
-    return "default"
+def _get_memory_context_for_comparison(query: str) -> str:
+    """
+    Build context from what the agent has already learned.
+    Prioritises sites that worked most often in past runs.
+    """
+    data = _load_general()
+    sources = data.get("successful_sources", {})
+    blocked = data.get("blocked_sites", [])
 
+    if not sources and not blocked:
+        return ""  # No memory yet — agent will learn from scratch
 
-def _get_blocked_from_memory() -> list[str]:
-    """Get all sites marked as blocked across any task type."""
-    memory = load_memory()
-    blocked = list(BLOCKED_SITES)
-    for task_data in memory.values():
-        blocked.extend(task_data.get("blocked", []))
-    return list(set(blocked))
+    # Sort by success count
+    top = sorted(sources.items(), key=lambda x: x[1], reverse=True)[:5]
+
+    lines = ["## WHAT I LEARNED FROM PREVIOUS RESEARCH SESSIONS"]
+    if top:
+        lines.append("Sites that worked well in past searches (most reliable first):")
+        for domain, count in top:
+            lines.append(f"  ✅ {domain} — worked {count} time(s)")
+    if blocked:
+        lines.append("Sites that blocked me or failed — skip immediately:")
+        for domain in blocked[:8]:
+            lines.append(f"  ❌ {domain}")
+    lines.append("Use this knowledge to pick your starting sites, but stay open to discovering new ones via Google.\n")
+    return "\n".join(lines)
 
 
 async def run_comparison(query: str, task_id: str = "") -> dict:
     """
-    Hybrid comparison: reliable known sites + Google-discovered alternative.
+    Self-learning comparison: Google-first discovery + memory-informed site selection.
+    After every run, updates memory with what worked.
     """
+    from datetime import datetime
+    current_year = datetime.now().year
+
     memory_ctx = get_general_context(query)
-    category = _get_category(query)
-    reliable = RELIABLE_SITES.get(category, RELIABLE_SITES["default"])
-    blocked = _get_blocked_from_memory()
-
-    # Filter out any blocked sites from reliable list
-    usable = [s for s in reliable if not any(b in s for b in blocked)]
-    if not usable:
-        usable = reliable[:1]  # always have at least one to try
-
-    sites_str = " and ".join(usable[:2])
-
-    # Build a discover-and-compare prompt
-    discover_hint = _call_llm(f"""For this price comparison query: "{query}"
-
-I already know these sites work reliably: {', '.join(usable[:2])}
-These sites have bot protection and should be AVOIDED: {', '.join(BLOCKED_SITES[:5])}
-
-What ONE additional site (not in either list above) might have competitive prices?
-Consider: regional Indian sites, direct sellers, official brand sites, comparison aggregators.
-Return ONLY the website URL (e.g. "croma.com"). Nothing else.""", task_type="planning")
-
-    discover_hint = discover_hint.strip().replace("https://", "").replace("http://", "").split("/")[0] if discover_hint else ""
-    # Validate it's not a blocked site
-    if any(b in discover_hint for b in blocked) or not discover_hint:
-        discover_hint = ""
-
-    all_sources = usable[:2]
-    if discover_hint and discover_hint not in all_sources:
-        all_sources.append(discover_hint)
-
-    sources_list = "\n".join(f"- https://{s}" for s in all_sources)
+    learned_ctx = _get_memory_context_for_comparison(query)
 
     task = f"""{memory_ctx}
+{learned_ctx}
 
 COMPARISON QUERY: {query}
 
-SEARCH STRATEGY:
-You MUST check prices on these specific sites (they are confirmed to work):
-{sources_list}
+YOUR TASK — find the best result by comparing multiple sources:
 
-IMPORTANT — AVOID these sites (bot detection, will waste your time):
-{chr(10).join(f'- {s}' for s in BLOCKED_SITES[:6])}
+STEP 1 — DISCOVER SOURCES VIA GOOGLE:
+1. Go to https://www.google.com
+2. Search for: {query} best price {current_year}
+3. Look at the top 5 search results — these are the sites Google trusts most
+4. Also look at Google Shopping results if visible
+5. Note the top 3-4 distinct domains from the results
 
-STEP-BY-STEP INSTRUCTIONS:
+STEP 2 — TRY EACH SOURCE (max 8-10 steps per site):
+For each site discovered:
+- Navigate to it and search for the specific item/query
+- If it BLOCKS you (CAPTCHA, login wall, bot detection) within 3 steps → STOP, move to next site, and remember it failed
+- If it WORKS → extract: name, price/option, offers, rating, URL
+- Keep going until you have data from at least 2 working sources
 
-For EACH site in the list above:
-1. Navigate directly to the URL
-2. Search for the exact item/option in the query
-3. Extract: name, price, any discounts/offers, rating if shown, availability, direct URL
-4. If a site blocks you or shows CAPTCHA — immediately move to the next site, do NOT retry
+STEP 3 — LEARN AND REPORT:
+After trying sites, in your FINAL RESULT include:
+- A comparison table with all working sources side by side
+- BEST VALUE = [site] at [price/option] because [reason]
+- Direct links to each result found
+- Note any sites that were blocked (so future searches skip them)
 
-After checking all sites:
-5. Build a comparison table:
-   | Site | Price | Discount | Rating | Notes |
-6. Clearly state: BEST VALUE = [site] at [price]
-7. Include direct links to each listing found
+IMPORTANT RULES:
+- Always start with Google to discover sources — don't assume which sites are best
+- If the first site fails, try the next Google result immediately
+- Never spend more than 10 steps on a single site
+- A site that loads slowly but eventually works is fine — a site that shows CAPTCHA/login wall is not
+- The goal is finding the BEST result, not just the first result"""
 
-Be efficient — spend max 8-10 steps per site, then move on."""
+    result = await run_deep_task(task, task_type="research", task_id=task_id, max_steps=35)
 
-    result = await run_deep_task(task, task_type="research", task_id=task_id, max_steps=30)
+    # Learn from this run — extract which sites appeared in the result
+    if result:
+        import re
+        # Sites mentioned positively (in tables, URLs, recommendations)
+        found_domains = re.findall(r'(?:https?://)?(?:www\.)?([a-zA-Z0-9-]+\.[a-zA-Z]{2,})(?:/[^\s\)]*)?', result)
+        failed_signals = ["blocked", "captcha", "login wall", "could not access", "unable to reach"]
 
-    # If result is empty, try with just the most reliable single source
-    if not result or len(result.strip()) < 100:
-        fallback_task = f"""Find the price of this: {query}
-
-Go directly to https://{usable[0]} and search.
-Extract: exact product name, current price, any offers, direct link.
-Return the price information you find."""
-        result = await run_deep_task(fallback_task, task_type="research", task_id=task_id, max_steps=15)
+        for domain in set(found_domains):
+            if len(domain) < 5:
+                continue
+            # Check if this domain is mentioned near a failure signal
+            idx = result.lower().find(domain.lower())
+            context_around = result.lower()[max(0, idx-100):idx+100]
+            failed = any(sig in context_around for sig in failed_signals)
+            _record_site_outcome(domain, worked=not failed)
 
     update_general(query, result, success=bool(result and len(result) > 100))
     return {"query": query, "result": result, "task_type": "comparison"}
