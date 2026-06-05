@@ -5,6 +5,7 @@ Detects ambiguity, generates one clarifying question, and defines the success co
 
 import json
 from backend.tools.planner import _call_llm
+# Uses SMALL model — ambiguity detection is a simple classification task
 
 
 def interpret(query: str) -> dict:
@@ -36,7 +37,7 @@ Return only valid JSON, no markdown:
   "refined_query": "..."
 }}"""
 
-    raw = _call_llm(prompt)
+    raw = _call_llm(prompt, task_type="ambiguity_check")
     if not raw:
         return {
             "is_ambiguous": False,

@@ -181,6 +181,13 @@ async def start_hackathon(request: dict, background_tasks: BackgroundTasks):
 
 # --- Memory + status endpoints ---
 
+@router.get("/evals")
+async def get_evals():
+    """Model performance baseline — shows pass rate, confidence, latency per model/task."""
+    from backend.tools.model_selector import get_eval_report
+    return get_eval_report()
+
+
 @router.get("/memory")
 async def get_memory():
     return {"task_memory": load_memory(), "general_memory": _load_general()}

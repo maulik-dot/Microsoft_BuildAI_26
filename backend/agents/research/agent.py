@@ -13,12 +13,14 @@ Handles all 10 core capabilities:
 10. Reporting Back        — confidence score, needs_review flag, gap list
 """
 
+import time
 from backend.tools.browser import run_deep_task
 from backend.tools.planner import plan_research, replan
 from backend.tools.step_tracker import StepTracker, TaskScratchpad, parse_plan_steps
 from backend.tools.goal_interpreter import interpret
 from backend.tools.verifier import verify
 from backend.memory.agent_memory import get_general_context, update_general
+from backend.tools.model_selector import record_eval, get_model_for_tier, ModelTier
 
 MAX_RETRIES = 2
 
@@ -70,10 +72,22 @@ async def run_research(query: str, task_id: str = "") -> dict:
         max_steps = 40 if attempt == 0 else 20
 
         # ── 4. BROWSER EXECUTION ──────────────────────────────────────────
+        browser_model = get_model_for_tier(ModelTier.LARGE)
+        t_start = time.time()
         result = await run_deep_task(task, task_type="research", max_steps=max_steps)
+        latency_ms = int((time.time() - t_start) * 1000)
 
         # ── 5. VERIFICATION ───────────────────────────────────────────────
         verdict = verify(refined_query, result, success_condition)
+
+        # ── 5a. RECORD EVAL ───────────────────────────────────────────────
+        record_eval(
+            task_type="browser_agent",
+            model=browser_model,
+            passed=verdict.get("passed", False),
+            confidence=verdict.get("confidence", 0),
+            latency_ms=latency_ms,
+        )
 
         # Extract key data points into scratchpad for potential retry
         _update_scratchpad(scratchpad, result, attempt)

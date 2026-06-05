@@ -7,6 +7,7 @@ and flags anything needing human review.
 import json
 import re
 from backend.tools.planner import _call_llm
+# Uses SMALL model — verification is structured evaluation, not open-ended reasoning
 from backend.memory.agent_memory import BLOCKED_PATTERNS
 
 
@@ -73,7 +74,7 @@ Rules:
 
 Return only valid JSON, no markdown."""
 
-    raw = _call_llm(prompt)
+    raw = _call_llm(prompt, task_type="verification")
     if not raw:
         # Heuristic fallback: check for URLs and concrete data
         has_urls = bool(re.search(r'https?://', result))
