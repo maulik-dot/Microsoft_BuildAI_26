@@ -192,6 +192,146 @@ async def get_knowledge():
     return _load()
 
 
+@router.post("/knowledge/seed")
+async def seed_knowledge(request: dict):
+    """
+    Manually teach the agent about a site — no browsing needed.
+    Body: {
+      "site": "ixigo.com",
+      "category": "travel",
+      "navigation_hint": "Enter city in From/To fields, wait for dropdown, click Search",
+      "tips": ["Flights load in 3-5s", "Non-stop filter on left panel"],
+      "works_for": ["flight search", "hotel search"]
+    }
+    """
+    from backend.tools.learner import _load, _save
+    knowledge = _load()
+
+    site = request.get("site", "").strip().lower()
+    if not site:
+        return {"error": "site is required"}
+
+    # Clean domain
+    import re
+    site = re.sub(r'^(https?://)?(www\.)?', '', site).split('/')[0]
+
+    sites_node = knowledge.setdefault("sites", {})
+    entry = sites_node.setdefault(site, {
+        "success_count": 0, "fail_count": 0,
+        "avg_steps": 0, "total_steps": 0, "runs": 0,
+        "tips": [], "navigation_hint": "", "last_seen": None,
+    })
+
+    if request.get("navigation_hint"):
+        entry["navigation_hint"] = request["navigation_hint"][:200]
+
+    if request.get("tips"):
+        existing_tips = entry.get("tips", [])
+        for tip in request["tips"]:
+            if tip not in existing_tips:
+                existing_tips.append(tip)
+        entry["tips"] = existing_tips[:10]
+
+    # Add to domain shortcuts
+    if request.get("category") and request.get("works_for"):
+        shortcuts = knowledge.setdefault("domain_shortcuts", {})
+        for cat in request["works_for"]:
+            cat_list = shortcuts.setdefault(cat.lower(), [])
+            if site not in cat_list:
+                cat_list.insert(0, site)
+            shortcuts[cat.lower()] = cat_list[:5]
+
+    # Boost success count for seeded sites
+    entry["success_count"] = max(entry.get("success_count", 0), 2)
+
+    _save(knowledge)
+    return {"status": "seeded", "site": site, "entry": entry}
+
+
+@router.post("/knowledge/correct")
+async def correct_knowledge(request: dict):
+    """
+    Submit a correction when the agent got something wrong.
+    Body: {
+      "query": "find cheapest flights Mumbai Delhi",
+      "what_went_wrong": "Agent tried MakeMyTrip which blocked it",
+      "correct_approach": "Go directly to ixigo.com/flights, don't use MakeMyTrip",
+      "bad_site": "makemytrip.com",
+      "good_site": "ixigo.com"
+    }
+    The agent learns from this correction immediately.
+    """
+    from backend.tools.learner import _load, _save
+    from backend.memory.agent_memory import mark_blocked, mark_works
+    knowledge = _load()
+
+    query = request.get("query", "")
+    what_went_wrong = request.get("what_went_wrong", "")
+    correct_approach = request.get("correct_approach", "")
+    bad_site = request.get("bad_site", "").strip().lower()
+    good_site = request.get("good_site", "").strip().lower()
+
+    # Mark bad site as failed
+    if bad_site:
+        import re
+        bad_site = re.sub(r'^(https?://)?(www\.)?', '', bad_site).split('/')[0]
+        sites_node = knowledge.setdefault("sites", {})
+        bad_entry = sites_node.setdefault(bad_site, {"success_count": 0, "fail_count": 0, "runs": 0})
+        bad_entry["fail_count"] = bad_entry.get("fail_count", 0) + 2  # weight corrections more
+        mark_blocked("research", bad_site)
+
+    # Mark good site as working
+    if good_site:
+        import re
+        good_site = re.sub(r'^(https?://)?(www\.)?', '', good_site).split('/')[0]
+        sites_node = knowledge.setdefault("sites", {})
+        good_entry = sites_node.setdefault(good_site, {"success_count": 0, "fail_count": 0, "runs": 0})
+        good_entry["success_count"] = good_entry.get("success_count", 0) + 2
+        mark_works("research", good_site)
+
+    # Store correction as an obstacle solution
+    if what_went_wrong and correct_approach:
+        solutions = knowledge.setdefault("obstacle_solutions", [])
+        from datetime import datetime
+        solutions.append({
+            "obstacle": what_went_wrong,
+            "solution": correct_approach,
+            "query_example": query[:100],
+            "bad_site": bad_site,
+            "good_site": good_site,
+            "source": "human_correction",
+            "date": datetime.now().strftime("%Y-%m-%d"),
+        })
+        knowledge["obstacle_solutions"] = solutions[-30:]
+
+    # Add correct approach as navigation hint for good site
+    if good_site and correct_approach:
+        sites_node = knowledge.setdefault("sites", {})
+        entry = sites_node.setdefault(good_site, {"success_count": 2, "fail_count": 0})
+        if not entry.get("navigation_hint"):
+            entry["navigation_hint"] = correct_approach[:200]
+
+    _save(knowledge)
+    return {
+        "status": "correction recorded",
+        "bad_site_penalized": bad_site or None,
+        "good_site_boosted": good_site or None,
+        "lesson_saved": bool(what_went_wrong and correct_approach),
+    }
+
+
+@router.delete("/knowledge/reset")
+async def reset_knowledge():
+    """Reset the web knowledge base (useful for testing)."""
+    from backend.tools.learner import _save
+    _save({
+        "sites": {}, "search_patterns": {},
+        "obstacle_solutions": [], "domain_shortcuts": {},
+        "last_updated": None,
+    })
+    return {"status": "knowledge base reset"}
+
+
 @router.get("/evals")
 async def get_evals():
     """Model performance baseline — shows pass rate, confidence, latency per model/task."""

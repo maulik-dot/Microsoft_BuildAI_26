@@ -310,6 +310,7 @@
     <span>Online</span>
   </div>
   <div class="header-btns">
+    <button class="btn-icon" onclick="toggleTrainPanel()" title="Train agent">🎓</button>
     <button class="btn-icon" onclick="newChat()" title="New chat">✕</button>
   </div>
 </header>
@@ -367,6 +368,123 @@
   </div>
 </main>
 <div id="toast"></div>
+
+<!-- TRAINING PANEL -->
+<div id="train-panel" style="display:none;position:fixed;top:0;right:0;width:380px;height:100vh;
+  background:var(--bg2);border-left:1px solid var(--border);z-index:50;overflow-y:auto;
+  padding:20px;box-shadow:-4px 0 20px rgba(0,0,0,0.4);">
+
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;">
+    <div style="font-size:15px;font-weight:700;color:var(--cyan)">🎓 Train Agent</div>
+    <button onclick="toggleTrainPanel()" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:18px;">✕</button>
+  </div>
+
+  <!-- TAB SWITCHER -->
+  <div style="display:flex;gap:6px;margin-bottom:18px;">
+    <button onclick="switchTab('seed')" id="tab-seed"
+      style="flex:1;padding:7px;border-radius:8px;border:1px solid var(--cyan);
+      background:var(--cyan-dim);color:var(--cyan);font-size:12px;font-weight:600;cursor:pointer;font-family:var(--font)">
+      Seed Site
+    </button>
+    <button onclick="switchTab('correct')" id="tab-correct"
+      style="flex:1;padding:7px;border-radius:8px;border:1px solid var(--border);
+      background:var(--surface);color:var(--text2);font-size:12px;font-weight:600;cursor:pointer;font-family:var(--font)">
+      Correct Error
+    </button>
+    <button onclick="switchTab('view')" id="tab-view"
+      style="flex:1;padding:7px;border-radius:8px;border:1px solid var(--border);
+      background:var(--surface);color:var(--text2);font-size:12px;font-weight:600;cursor:pointer;font-family:var(--font)">
+      View Knowledge
+    </button>
+  </div>
+
+  <!-- SEED TAB -->
+  <div id="pane-seed">
+    <p style="font-size:12px;color:var(--text3);margin-bottom:14px;line-height:1.5;">
+      Teach the agent how to navigate a site without running it.
+    </p>
+    <label style="font-size:11px;color:var(--text2);display:block;margin-bottom:5px;">Site domain</label>
+    <input id="seed-site" placeholder="e.g. ixigo.com" style="width:100%;padding:8px 12px;border-radius:8px;
+      background:var(--bg3);border:1px solid var(--border);color:var(--text);font-family:var(--font);
+      font-size:13px;outline:none;margin-bottom:10px;">
+
+    <label style="font-size:11px;color:var(--text2);display:block;margin-bottom:5px;">Category</label>
+    <input id="seed-category" placeholder="e.g. travel, jobs, price_comparison" style="width:100%;padding:8px 12px;border-radius:8px;
+      background:var(--bg3);border:1px solid var(--border);color:var(--text);font-family:var(--font);
+      font-size:13px;outline:none;margin-bottom:10px;">
+
+    <label style="font-size:11px;color:var(--text2);display:block;margin-bottom:5px;">Navigation hint</label>
+    <textarea id="seed-hint" rows="3" placeholder="e.g. Enter city in From/To fields, wait for dropdown, click Search button"
+      style="width:100%;padding:8px 12px;border-radius:8px;background:var(--bg3);border:1px solid var(--border);
+      color:var(--text);font-family:var(--font);font-size:13px;outline:none;resize:vertical;margin-bottom:10px;"></textarea>
+
+    <label style="font-size:11px;color:var(--text2);display:block;margin-bottom:5px;">Tips (one per line)</label>
+    <textarea id="seed-tips" rows="3" placeholder="Results take 3-5s to load&#10;Non-stop filter on left panel"
+      style="width:100%;padding:8px 12px;border-radius:8px;background:var(--bg3);border:1px solid var(--border);
+      color:var(--text);font-family:var(--font);font-size:13px;outline:none;resize:vertical;margin-bottom:14px;"></textarea>
+
+    <button onclick="submitSeed()" style="width:100%;padding:10px;border-radius:8px;border:none;
+      background:linear-gradient(135deg,var(--cyan),var(--purple));color:#000;font-weight:700;
+      font-family:var(--font);font-size:13px;cursor:pointer;">
+      Teach Agent →
+    </button>
+  </div>
+
+  <!-- CORRECT TAB -->
+  <div id="pane-correct" style="display:none">
+    <p style="font-size:12px;color:var(--text3);margin-bottom:14px;line-height:1.5;">
+      When the agent got something wrong, tell it what it should have done instead.
+    </p>
+    <label style="font-size:11px;color:var(--text2);display:block;margin-bottom:5px;">What was the query?</label>
+    <input id="corr-query" placeholder="e.g. find cheapest flights Mumbai Delhi" style="width:100%;padding:8px 12px;border-radius:8px;
+      background:var(--bg3);border:1px solid var(--border);color:var(--text);font-family:var(--font);
+      font-size:13px;outline:none;margin-bottom:10px;">
+
+    <label style="font-size:11px;color:var(--text2);display:block;margin-bottom:5px;">What went wrong?</label>
+    <textarea id="corr-wrong" rows="2" placeholder="e.g. Agent tried MakeMyTrip which blocked it"
+      style="width:100%;padding:8px 12px;border-radius:8px;background:var(--bg3);border:1px solid var(--border);
+      color:var(--text);font-family:var(--font);font-size:13px;outline:none;resize:vertical;margin-bottom:10px;"></textarea>
+
+    <label style="font-size:11px;color:var(--text2);display:block;margin-bottom:5px;">What should it do instead?</label>
+    <textarea id="corr-approach" rows="2" placeholder="e.g. Go directly to ixigo.com/flights"
+      style="width:100%;padding:8px 12px;border-radius:8px;background:var(--bg3);border:1px solid var(--border);
+      color:var(--text);font-family:var(--font);font-size:13px;outline:none;resize:vertical;margin-bottom:10px;"></textarea>
+
+    <div style="display:flex;gap:8px;margin-bottom:14px;">
+      <div style="flex:1">
+        <label style="font-size:11px;color:var(--red);display:block;margin-bottom:5px;">Bad site (to avoid)</label>
+        <input id="corr-bad" placeholder="makemytrip.com" style="width:100%;padding:8px 12px;border-radius:8px;
+          background:var(--bg3);border:1px solid rgba(239,68,68,.3);color:var(--text);font-family:var(--font);
+          font-size:13px;outline:none;">
+      </div>
+      <div style="flex:1">
+        <label style="font-size:11px;color:var(--green);display:block;margin-bottom:5px;">Good site (use this)</label>
+        <input id="corr-good" placeholder="ixigo.com" style="width:100%;padding:8px 12px;border-radius:8px;
+          background:var(--bg3);border:1px solid rgba(16,185,129,.3);color:var(--text);font-family:var(--font);
+          font-size:13px;outline:none;">
+      </div>
+    </div>
+
+    <button onclick="submitCorrection()" style="width:100%;padding:10px;border-radius:8px;border:none;
+      background:linear-gradient(135deg,var(--orange),var(--red));color:#fff;font-weight:700;
+      font-family:var(--font);font-size:13px;cursor:pointer;">
+      Submit Correction →
+    </button>
+  </div>
+
+  <!-- VIEW TAB -->
+  <div id="pane-view" style="display:none">
+    <button onclick="loadKnowledge()" style="width:100%;padding:8px;border-radius:8px;border:1px solid var(--border);
+      background:var(--surface);color:var(--text2);font-family:var(--font);font-size:12px;cursor:pointer;margin-bottom:12px;">
+      🔄 Refresh
+    </button>
+    <div id="knowledge-view" style="font-size:11.5px;color:var(--text2);font-family:var(--mono);
+      background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:12px;
+      max-height:calc(100vh - 160px);overflow-y:auto;white-space:pre-wrap;word-break:break-all;">
+      Click Refresh to load...
+    </div>
+  </div>
+</div>
 
 <script>
 const API = 'http://localhost:8000';
@@ -664,6 +782,113 @@ function copyMsg(btn) {
 function newChat() {
   chatHistory = [];
   window.location.reload();
+}
+
+// ── TRAINING PANEL ────────────────────────────────────────────────────────
+function toggleTrainPanel() {
+  const p = document.getElementById('train-panel');
+  p.style.display = p.style.display === 'none' ? 'block' : 'none';
+}
+
+function switchTab(tab) {
+  ['seed','correct','view'].forEach(t => {
+    document.getElementById(`pane-${t}`).style.display = t === tab ? 'block' : 'none';
+    const btn = document.getElementById(`tab-${t}`);
+    if (t === tab) {
+      btn.style.borderColor = 'var(--cyan)';
+      btn.style.background = 'var(--cyan-dim)';
+      btn.style.color = 'var(--cyan)';
+    } else {
+      btn.style.borderColor = 'var(--border)';
+      btn.style.background = 'var(--surface)';
+      btn.style.color = 'var(--text2)';
+    }
+  });
+  if (tab === 'view') loadKnowledge();
+}
+
+async function submitSeed() {
+  const site = document.getElementById('seed-site').value.trim();
+  const hint = document.getElementById('seed-hint').value.trim();
+  const category = document.getElementById('seed-category').value.trim();
+  const tipsRaw = document.getElementById('seed-tips').value.trim();
+  if (!site) { toast('Site domain is required'); return; }
+
+  const tips = tipsRaw ? tipsRaw.split('\n').filter(t => t.trim()) : [];
+  const works_for = category ? [category] : [];
+
+  try {
+    const r = await fetch(`${API}/tasks/knowledge/seed`, {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({site, navigation_hint: hint, category, tips, works_for})
+    });
+    const d = await r.json();
+    toast(`✅ Taught agent about ${d.site}`);
+    document.getElementById('seed-site').value = '';
+    document.getElementById('seed-hint').value = '';
+    document.getElementById('seed-tips').value = '';
+  } catch(e) { toast('Failed to seed knowledge'); }
+}
+
+async function submitCorrection() {
+  const query = document.getElementById('corr-query').value.trim();
+  const wrong = document.getElementById('corr-wrong').value.trim();
+  const approach = document.getElementById('corr-approach').value.trim();
+  const bad = document.getElementById('corr-bad').value.trim();
+  const good = document.getElementById('corr-good').value.trim();
+
+  if (!wrong && !bad) { toast('Tell me what went wrong'); return; }
+
+  try {
+    const r = await fetch(`${API}/tasks/knowledge/correct`, {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        query, what_went_wrong: wrong,
+        correct_approach: approach, bad_site: bad, good_site: good
+      })
+    });
+    const d = await r.json();
+    toast(`✅ Correction recorded — agent will avoid ${d.bad_site_penalized || 'bad sites'} next time`);
+    ['corr-query','corr-wrong','corr-approach','corr-bad','corr-good'].forEach(id => {
+      document.getElementById(id).value = '';
+    });
+  } catch(e) { toast('Failed to record correction'); }
+}
+
+async function loadKnowledge() {
+  const el = document.getElementById('knowledge-view');
+  el.textContent = 'Loading...';
+  try {
+    const r = await fetch(`${API}/tasks/knowledge`);
+    const d = await r.json();
+    const sites = d.sites || {};
+    const shortcuts = d.domain_shortcuts || {};
+    const patterns = d.search_patterns || {};
+
+    let out = `=== SITES (${Object.keys(sites).length} known) ===\n`;
+    Object.entries(sites)
+      .sort((a,b) => (b[1].success_count||0) - (a[1].success_count||0))
+      .forEach(([domain, s]) => {
+        out += `\n${domain}\n`;
+        out += `  ✅ ${s.success_count||0} success  ❌ ${s.fail_count||0} fail  ~${s.avg_steps||'?'} steps\n`;
+        if (s.navigation_hint) out += `  💡 ${s.navigation_hint}\n`;
+        (s.tips||[]).forEach(t => { out += `  → ${t}\n`; });
+      });
+
+    out += `\n=== DOMAIN SHORTCUTS ===\n`;
+    Object.entries(shortcuts).forEach(([cat, sites]) => {
+      out += `  ${cat}: ${sites.join(' → ')}\n`;
+    });
+
+    out += `\n=== SEARCH PATTERNS ===\n`;
+    Object.entries(patterns).forEach(([cat, queries]) => {
+      out += `  ${cat}:\n`;
+      queries.forEach(q => { out += `    "${q}"\n`; });
+    });
+
+    out += `\nLast updated: ${d.last_updated || 'never'}`;
+    el.textContent = out;
+  } catch(e) { el.textContent = 'Failed to load knowledge'; }
 }
 
 function useSugg(card) {
