@@ -13,6 +13,10 @@ class ResearchRequest(BaseModel):
     query: str
 
 
+class AnswerRequest(BaseModel):
+    answer: str
+
+
 class TaskResponse(BaseModel):
     task_id: str
     status: str
@@ -25,6 +29,14 @@ def _update(task_id: str, **kwargs):
         task_store[task_id].update(kwargs)
 
 
+def _new_task(task_id: str, **kwargs) -> dict:
+    record = {"task_id": task_id, "status": "pending", "result": None,
+              "error": None, "confidence": None, "needs_review": False,
+              "clarifying_question": None, **kwargs}
+    task_store[task_id] = record
+    return record
+
+
 # --- General research endpoint ---
 
 @router.post("/research")
@@ -32,13 +44,52 @@ async def start_research(request: ResearchRequest, background_tasks: BackgroundT
     from backend.agents.research.agent import run_research
 
     task_id = str(uuid.uuid4())
-    task_store[task_id] = {"task_id": task_id, "status": "pending", "result": None, "error": None}
+    _new_task(task_id)
 
     async def run():
         _update(task_id, status="running")
         try:
-            result = await run_research(request.query)
-            _update(task_id, status="completed", result=result)
+            result = await run_research(request.query, task_id=task_id)
+            if result.get("status") == "waiting_user":
+                _update(task_id,
+                    status="waiting_user",
+                    result=result,
+                    clarifying_question=result.get("clarifying_question"))
+            else:
+                _update(task_id,
+                    status="completed",
+                    result=result,
+                    confidence=result.get("confidence", 50),
+                    needs_review=result.get("needs_review", False))
+        except Exception as e:
+            _update(task_id, status="failed", error=str(e))
+
+    background_tasks.add_task(run)
+    return task_store[task_id]
+
+
+@router.post("/{task_id}/answer")
+async def answer_clarification(task_id: str, request: AnswerRequest, background_tasks: BackgroundTasks):
+    """Resume a waiting_user task with the user's clarification answer."""
+    from backend.agents.research.agent import run_research
+
+    if task_id not in task_store:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    task = task_store[task_id]
+    original_query = task.get("result", {}).get("query", "")
+    refined_query = f"{original_query} [clarification: {request.answer}]"
+
+    _update(task_id, status="running", clarifying_question=None)
+
+    async def run():
+        try:
+            result = await run_research(refined_query, task_id=task_id)
+            _update(task_id,
+                status="completed",
+                result=result,
+                confidence=result.get("confidence", 50),
+                needs_review=result.get("needs_review", False))
         except Exception as e:
             _update(task_id, status="failed", error=str(e))
 

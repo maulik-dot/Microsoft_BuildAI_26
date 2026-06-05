@@ -70,3 +70,24 @@ Write a concise numbered plan (max 8 steps):
 Be specific. Use real site names. Return ONLY the numbered plan.""")
 
     return f"## EXECUTION PLAN\n{result}\n\n## TASK\n" if result else ""
+
+
+def replan(original_goal: str, step_tracker_dump: str, retry_hint: str) -> str:
+    """Generate a revised plan after a failed attempt."""
+    result = _call_llm(f"""A web research agent tried to complete this goal but failed.
+
+ORIGINAL GOAL: {original_goal}
+
+PREVIOUS ATTEMPT STATUS:
+{step_tracker_dump}
+
+VERIFIER SUGGESTION: {retry_hint}
+
+Write a NEW concise plan (max 6 steps) that:
+1. Avoids the approaches that already failed
+2. Applies the verifier's suggestion
+3. Uses alternative sites or search strategies
+
+Return ONLY the numbered plan.""")
+
+    return f"## REVISED PLAN (retry)\n{result}\n\n## TASK\n" if result else ""

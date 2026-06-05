@@ -16,10 +16,9 @@ Examples:
 - *"Is Samsung Galaxy S24 available under ₹55,000?"*
 - *"Find hackathons for a BTech CSE engineer good at Python and ML"*
 - *"What are the top AI startups in India in 2025?"*
-- *"Compare iPhone 15 vs Samsung S24 — which is better value?"*
-- *"Best online courses for machine learning under ₹5000"*
+- *"Find a Django course under ₹999 on Udemy and a free YouTube playlist"*
 
-Just type anything — I'll figure out where to search and find the best answer."""
+Just type anything — I'll figure out where to search."""
 
 
 @cl.on_chat_start
@@ -30,7 +29,6 @@ async def start():
 
 @cl.on_message
 async def handle_message(message: cl.Message):
-    # Handle PDF resume uploads
     if message.elements:
         for el in message.elements:
             if hasattr(el, "path") and el.path.endswith(".pdf"):
@@ -38,10 +36,8 @@ async def handle_message(message: cl.Message):
                 return
 
     query = message.content.strip()
-
-    # Inject resume context if available and relevant
     resume = cl.user_session.get("resume_text")
-    if resume and any(w in query.lower() for w in ["job", "hackathon", "opportunity", "apply", "hire"]):
+    if resume and any(w in query.lower() for w in ["job", "hackathon", "opportunity", "apply"]):
         query = f"{query}\n\nMy profile: {resume[:400]}"
 
     await run_research(query)
@@ -62,15 +58,11 @@ async def handle_resume_upload(path: str, message: str):
         cl.user_session.set("resume_text", data.get("resume_text", ""))
         skills = ", ".join(profile.get("skills", [])[:6])
         msg.content = (
-            f"Resume saved!\n\n"
-            f"**{profile.get('name', 'You')}** | {profile.get('current_role', 'N/A')}\n"
-            f"**Skills:** {skills}\n"
-            f"**Experience:** {profile.get('experience_years', 'N/A')} years\n\n"
-            f"Now ask me anything — I'll use your profile automatically for job/hackathon searches."
+            f"Resume saved!\n\n**{profile.get('name', 'You')}** | {profile.get('current_role', 'N/A')}\n"
+            f"**Skills:** {skills} | **Experience:** {profile.get('experience_years', 'N/A')} years\n\n"
+            f"Now ask me anything — I'll use your profile for job/hackathon searches."
         )
         await msg.update()
-
-        # If there was a message alongside the upload, research it
         if message.strip():
             await run_research(f"{message}\n\nMy profile: {data.get('resume_text','')[:400]}")
     except Exception as e:
@@ -79,10 +71,9 @@ async def handle_resume_upload(path: str, message: str):
 
 
 async def run_research(query: str):
-    msg = cl.Message(content="🔍 Researching...")
+    msg = cl.Message(content="🔍 Analysing your query...")
     await msg.send()
 
-    # Start research task
     try:
         async with httpx.AsyncClient(timeout=15) as client:
             resp = await client.post(f"{API_BASE}/tasks/research", json={"query": query})
@@ -93,8 +84,11 @@ async def run_research(query: str):
         return
 
     task_id = task["task_id"]
-    dots = 0
+    await poll_task(task_id, msg)
 
+
+async def poll_task(task_id: str, msg: cl.Message):
+    dots = 0
     async with httpx.AsyncClient(timeout=10) as client:
         while True:
             try:
@@ -106,18 +100,71 @@ async def run_research(query: str):
 
             status = task["status"]
 
-            if status == "completed":
+            if status == "waiting_user":
+                # ── Clarifying question flow ──────────────────────────────
+                question = task.get("clarifying_question", "Could you clarify your request?")
+                msg.content = f"❓ **I need one clarification before I start:**\n\n{question}"
+                await msg.update()
+
+                answer = await cl.AskUserMessage(content=question, timeout=120).send()
+                if answer:
+                    # Submit clarification to backend
+                    try:
+                        async with httpx.AsyncClient(timeout=10) as c:
+                            await c.post(
+                                f"{API_BASE}/tasks/{task_id}/answer",
+                                json={"answer": answer["output"]},
+                            )
+                        msg.content = "🔍 Got it — researching now..."
+                        await msg.update()
+                    except Exception as e:
+                        msg.content = f"❌ Failed to submit answer: {e}"
+                        await msg.update()
+                        return
+                else:
+                    msg.content = "⏱️ No answer received — task cancelled."
+                    await msg.update()
+                    return
+
+            elif status == "completed":
                 result = task.get("result") or {}
-                answer = result.get("result") or result.get("summary") or "No result returned."
-                msg.content = f"🔍 **Research complete**\n\n{answer}"
+                answer_text = result.get("result") or "No result returned."
+                confidence = task.get("confidence") or result.get("confidence")
+                needs_review = task.get("needs_review") or result.get("needs_review", False)
+                gaps = result.get("gaps", [])
+
+                # Build confidence badge
+                conf_badge = _confidence_badge(confidence)
+
+                # Build review warning
+                review_warning = ""
+                if needs_review:
+                    review_warning = "\n\n⚠️ **Low confidence — recommend verifying manually.**"
+                    if gaps:
+                        review_warning += f"\n*Missing: {', '.join(gaps[:2])}*"
+
+                msg.content = f"🔍 **Research complete** {conf_badge}\n\n{answer_text}{review_warning}"
                 await msg.update()
                 break
+
             elif status == "failed":
                 msg.content = f"❌ **Failed:** {task.get('error', 'Unknown error')}"
                 await msg.update()
                 break
+
             else:
                 dots = (dots % 3) + 1
                 msg.content = f"🔍 Browsing the web{'.' * dots}"
                 await msg.update()
                 await asyncio.sleep(2)
+
+
+def _confidence_badge(confidence: int | None) -> str:
+    if confidence is None:
+        return ""
+    if confidence >= 80:
+        return f"✅ `{confidence}% confidence`"
+    elif confidence >= 60:
+        return f"🟡 `{confidence}% confidence`"
+    else:
+        return f"🔴 `{confidence}% confidence`"
