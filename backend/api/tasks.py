@@ -193,6 +193,13 @@ async def get_memory():
     return {"task_memory": load_memory(), "general_memory": _load_general()}
 
 
+@router.get("/{task_id}/steps")
+async def get_steps(task_id: str):
+    """Real-time step log for a running task."""
+    from backend.tools.browser import get_steps as _get_steps
+    return {"task_id": task_id, "steps": _get_steps(task_id)}
+
+
 @router.get("/{task_id}")
 async def get_task(task_id: str):
     if task_id not in task_store:
