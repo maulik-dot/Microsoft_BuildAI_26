@@ -75,7 +75,8 @@ async def run_research(query: str, task_id: str = "") -> dict:
         # ── 4. BROWSER EXECUTION ──────────────────────────────────────────
         browser_model = get_model_for_tier(ModelTier.LARGE)
         t_start = time.time()
-        result = await run_deep_task(task, task_type="research", task_id=task_id, max_steps=max_steps)
+        result = await run_deep_task(task, task_type="research", task_id=task_id,
+                                      temporal=temporal_intent, max_steps=max_steps)
         latency_ms = int((time.time() - t_start) * 1000)
 
         # ── 5. VERIFICATION ───────────────────────────────────────────────
@@ -120,19 +121,8 @@ def _build_task(query: str, memory_ctx: str, plan: str, scratchpad: TaskScratchp
     if not scratchpad.is_empty():
         parts.append(scratchpad.dump())
 
-    temporal_block = ""
-    if temporal_intent:
-        temporal_block = """
-⏰ TEMPORAL FILTER REQUIRED — The user wants RECENT/LATEST results:
-- On Google: after searching, click Tools → select "Past year" or "Past month"
-- OR add "2025 OR 2026" to your search query
-- Check the date of EVERY result before returning it
-- If the best result is older than 1 year, say so explicitly
-- For YouTube: filter by Upload date → This year
-"""
-
     parts.append(f"""RESEARCH QUERY: {query}
-{temporal_block}
+
 SUCCESS CONDITION: {success_condition}
 
 RESEARCH INSTRUCTIONS:

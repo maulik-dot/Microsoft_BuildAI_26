@@ -6,7 +6,7 @@ from backend.config import settings
 _browser: Browser | None = None
 _browser_lock = asyncio.Lock()
 
-# Global step log store: task_id -> list of step dicts
+# Step log store: task_id -> list of step dicts
 _step_logs: dict[str, list[dict]] = {}
 
 
@@ -25,8 +25,9 @@ def _make_browser(keep_alive: bool = True) -> Browser:
             headless=False,
             disable_security=True,
             keep_alive=keep_alive,
-            minimum_wait_page_load_time=0.5,
-            wait_between_actions=0.3,
+            # Principle 3: give agent time to observe after page loads
+            minimum_wait_page_load_time=0.8,
+            wait_between_actions=0.4,
             user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36",
         )
     )
@@ -40,43 +41,41 @@ async def get_browser() -> Browser:
     return _browser
 
 
-def _make_agent(task: str, browser: Browser, task_type: str = "", task_id: str = "") -> Agent:
+def _make_agent(task: str, browser: Browser, task_type: str = "",
+                task_id: str = "", temporal: bool = False) -> Agent:
     from backend.tools.context import get_system_context
 
     def on_step(browser_state, agent_output, step_number):
-        """Capture each step and store it for real-time frontend polling."""
+        """Capture each step for real-time UI streaming + self-verification."""
         try:
-            # Extract URL being visited
-            url = ""
-            if browser_state and hasattr(browser_state, 'url'):
-                url = browser_state.url or ""
+            url = getattr(browser_state, "url", "") or ""
+            title = getattr(browser_state, "title", "") or ""
 
-            # Extract action taken
             action_name = ""
             action_detail = ""
-            if agent_output and hasattr(agent_output, 'action'):
+            if agent_output and hasattr(agent_output, "action"):
                 actions = agent_output.action or []
                 if actions:
                     first = actions[0]
-                    action_name = type(first).__name__.lower().replace('action', '')
-                    # Try to get the URL or text from the action
-                    for attr in ('url', 'query', 'text', 'selector'):
+                    action_name = type(first).__name__.lower().replace("action", "")
+                    for attr in ("url", "query", "text", "selector", "value"):
                         val = getattr(first, attr, None)
                         if val:
                             action_detail = str(val)[:80]
                             break
 
-            # Extract memory/next_goal for user-friendly description
             description = ""
             if agent_output:
-                if hasattr(agent_output, 'next_goal') and agent_output.next_goal:
-                    description = str(agent_output.next_goal)[:120]
-                elif hasattr(agent_output, 'thinking') and agent_output.thinking:
-                    description = str(agent_output.thinking)[:120]
+                for attr in ("next_goal", "thinking", "memory"):
+                    val = getattr(agent_output, attr, None)
+                    if val:
+                        description = str(val)[:120]
+                        break
 
             step = {
                 "step": step_number,
                 "url": url,
+                "title": title,
                 "action": action_name,
                 "detail": action_detail,
                 "description": description,
@@ -93,15 +92,37 @@ def _make_agent(task: str, browser: Browser, task_type: str = "", task_id: str =
         task=task,
         llm=get_llm(),
         browser=browser,
+
+        # ── Timeouts ──
         llm_timeout=60,
         step_timeout=120,
-        extend_system_message=get_system_context(task_type),
+
+        # ── Principle 2: Smarter Planning ──
+        enable_planning=True,          # Agent writes plan before acting
+        planning_replan_on_stall=3,    # Replan after 3 steps without progress
+
+        # ── Principle 5: Recovery Loop ──
+        loop_detection_enabled=True,
+        loop_detection_window=8,       # Tighter than default 20 — catch loops faster
+        max_failures=4,                # Stop after 4 consecutive failures
+        final_response_after_failure=True,  # Always return something, never empty
+
+        # ── Principle 6: Self-Verification ──
+        use_judge=True,                # LLM judges if task was actually completed
+
+        # ── Principle 1 + 7: Better Observation + CoT ──
+        use_vision=True,               # Screenshot + DOM together
+        use_thinking=True,             # Chain-of-thought before every action
+
+        # ── System context: all 7 principles + learned memory ──
+        extend_system_message=get_system_context(task_type, temporal=temporal),
+
+        # ── Step streaming ──
         register_new_step_callback=on_step,
     )
 
 
 def get_steps(task_id: str) -> list[dict]:
-    """Return accumulated step logs for a task."""
     return _step_logs.get(task_id, [])
 
 
@@ -110,51 +131,43 @@ def clear_steps(task_id: str):
 
 
 def _extract_best_result(agent_history) -> str:
-    """
-    Extract the best available result from agent history.
-    Falls back gracefully if final_result() is empty.
-    """
-    # Try the official final result first
+    """Fallback chain: final_result → extracted_content → action_results."""
     final = agent_history.final_result()
     if final and len(final.strip()) > 50:
         return final
-
-    # Fallback: use the built-in extracted_content() method
     try:
         extracted = agent_history.extracted_content()
         if extracted and len(extracted.strip()) > 20:
             return extracted
     except Exception:
         pass
-
-    # Fallback: collect from action_results
     try:
-        collected = []
-        for r in agent_history.action_results():
-            content = getattr(r, 'extracted_content', None)
-            if content and len(str(content).strip()) > 20:
-                collected.append(str(content).strip())
+        collected = [
+            str(r.extracted_content).strip()
+            for r in agent_history.action_results()
+            if getattr(r, "extracted_content", None)
+            and len(str(r.extracted_content).strip()) > 20
+        ]
         if collected:
             return "\n\n".join(collected)
     except Exception:
         pass
-
     return ""
 
 
 async def run_browser_task(task: str, task_type: str = "", task_id: str = "",
-                           step_callback=None, max_steps: int = 25) -> str:
+                           temporal: bool = False, max_steps: int = 25) -> str:
     browser = await get_browser()
-    agent = _make_agent(task, browser, task_type, task_id)
+    agent = _make_agent(task, browser, task_type, task_id, temporal)
     result = await agent.run(max_steps=max_steps)
     return _extract_best_result(result)
 
 
 async def run_deep_task(task: str, task_type: str = "", task_id: str = "",
-                        max_steps: int = 40) -> str:
+                        temporal: bool = False, max_steps: int = 35) -> str:
     browser = _make_browser(keep_alive=False)
     try:
-        agent = _make_agent(task, browser, task_type, task_id)
+        agent = _make_agent(task, browser, task_type, task_id, temporal)
         result = await agent.run(max_steps=max_steps)
         return _extract_best_result(result)
     finally:
