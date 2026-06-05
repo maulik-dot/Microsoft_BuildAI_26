@@ -48,6 +48,7 @@ async def run_research(query: str, task_id: str = "") -> dict:
 
     refined_query = goal["refined_query"]
     success_condition = goal["success_condition"]
+    temporal_intent = goal.get("temporal_intent", False)
 
     # ── 2. PLANNING & STATE ────────────────────────────────────────────────
     memory_ctx = get_general_context(refined_query)
@@ -66,7 +67,7 @@ async def run_research(query: str, task_id: str = "") -> dict:
         else:
             current_plan = replan(refined_query, tracker.to_prompt_block(), verdict.get("retry_hint", ""))
 
-        task = _build_task(refined_query, memory_ctx, current_plan, scratchpad, success_condition)
+        task = _build_task(refined_query, memory_ctx, current_plan, scratchpad, success_condition, temporal_intent)
 
         # Fewer steps on retries — more focused
         max_steps = 20 if attempt == 0 else 12
@@ -113,14 +114,25 @@ async def run_research(query: str, task_id: str = "") -> dict:
     }
 
 
-def _build_task(query: str, memory_ctx: str, plan: str, scratchpad: TaskScratchpad, success_condition: str) -> str:
+def _build_task(query: str, memory_ctx: str, plan: str, scratchpad: TaskScratchpad, success_condition: str, temporal_intent: bool = False) -> str:
     parts = [memory_ctx, plan]
 
     if not scratchpad.is_empty():
         parts.append(scratchpad.dump())
 
-    parts.append(f"""RESEARCH QUERY: {query}
+    temporal_block = ""
+    if temporal_intent:
+        temporal_block = """
+⏰ TEMPORAL FILTER REQUIRED — The user wants RECENT/LATEST results:
+- On Google: after searching, click Tools → select "Past year" or "Past month"
+- OR add "2025 OR 2026" to your search query
+- Check the date of EVERY result before returning it
+- If the best result is older than 1 year, say so explicitly
+- For YouTube: filter by Upload date → This year
+"""
 
+    parts.append(f"""RESEARCH QUERY: {query}
+{temporal_block}
 SUCCESS CONDITION: {success_condition}
 
 RESEARCH INSTRUCTIONS:

@@ -52,6 +52,16 @@ For LAZY CONTENT:
   Escape: navigate to a completely different site or search query
 - If blocked by Cloudflare or similar: search Google for the content using site: operator instead
 
+## TEMPORAL INTENT — CRITICAL
+When the query contains ANY of these words: latest, new, recent, newest, upcoming, current, 2025, 2026, today, this year, just released, coming soon:
+- You MUST add time filters to your Google searches
+- Use Google's Tools → "Past year" or "Past month" filter after searching
+- OR add to your search query: "2025 OR 2026" or "site:youtube.com 2025 trailer"
+- ALWAYS check the date/year of any result before returning it
+- If you find a result from more than 2 years ago and the user said "latest", explicitly warn: "Note: This may not be the latest — oldest result found was from [year]. Consider searching again with year filter."
+- For trailers specifically: go to YouTube and filter by "Upload date: This year"
+- NEVER return an old result when the user asked for "latest" without explicitly noting the date
+
 ## CROSS-SERVICE DATA PASSING
 When you extract data from one site and need it on another:
 - Explicitly state what you found: "EXTRACTED: flight_price=₹4200, airline=IndiGo"

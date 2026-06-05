@@ -17,24 +17,31 @@ def interpret(query: str) -> dict:
         success_condition: str           — what "done" looks like
         refined_query: str               — cleaned-up version of the query
     """
-    prompt = f"""You are a query analyst for a web research agent.
+    CURRENT_YEAR = "2026"
+
+    prompt = f"""You are a query analyst for a web research agent. Today's year is {CURRENT_YEAR}.
 
 Analyse this user query and return JSON with exactly these fields:
 
 QUERY: "{query}"
 
 Rules:
-- is_ambiguous: true ONLY if the query is missing information that would change WHERE to search or WHAT to search for (e.g. "find flights" with no cities, "find a job" with no role). Vague style ("best", "good", "cheap") is NOT ambiguous.
-- clarifying_question: if is_ambiguous=true, write ONE short question to fill the most critical gap. If false, set null.
-- success_condition: a single sentence describing what a complete, correct answer must contain (e.g. "A list of at least 3 flights with prices, times and booking URLs").
-- refined_query: the query rewritten to be more precise and actionable, fixing obvious typos or vagueness. If already good, return as-is.
+- is_ambiguous: true ONLY if the query is missing critical information (e.g. "find flights" with no cities). Vague words like "best", "cheap", "latest" are NOT ambiguous — they are intent signals.
+- clarifying_question: if is_ambiguous=true, write ONE short question. If false, set null.
+- success_condition: what a complete correct answer must contain.
+- refined_query: rewrite the query to be more precise. IMPORTANT:
+  * If the query contains "latest", "new", "recent", "upcoming", "newest" → add "{CURRENT_YEAR}" to the refined query so searches are time-filtered. Example: "latest trailer of X" → "X {CURRENT_YEAR} latest trailer"
+  * If the query mentions a movie/show/album trailer → add "official trailer {CURRENT_YEAR}" and specify the platform (YouTube)
+  * Fix typos and hyphenation (e.g. "ice cream-man" → "Ice Cream Man")
+- temporal_intent: true if the query uses words like latest/new/recent/upcoming/current/this year, false otherwise
 
 Return only valid JSON, no markdown:
 {{
   "is_ambiguous": false,
   "clarifying_question": null,
   "success_condition": "...",
-  "refined_query": "..."
+  "refined_query": "...",
+  "temporal_intent": false
 }}"""
 
     raw = _call_llm(prompt, task_type="ambiguity_check")
@@ -57,6 +64,7 @@ Return only valid JSON, no markdown:
         result.setdefault("clarifying_question", None)
         result.setdefault("success_condition", "The query is fully answered.")
         result.setdefault("refined_query", query)
+        result.setdefault("temporal_intent", False)
         return result
     except Exception:
         return {
