@@ -8,8 +8,10 @@ _browser_lock = asyncio.Lock()
 
 
 def get_llm():
+    # Priority: Gemini (free quota) > OpenAI (if funded)
+    from backend.tools.model_selector import get_working_model
     return ChatGoogle(
-        model="gemini-3.1-flash-lite",
+        model=get_working_model(),
         api_key=settings.google_api_key,
         temperature=0,
     )
@@ -36,45 +38,50 @@ async def get_browser() -> Browser:
     return _browser
 
 
-async def run_browser_task(task: str, step_callback=None, max_steps: int = 25) -> str:
-    """Single-phase task using the warm persistent browser."""
-    browser = await get_browser()
-    agent = Agent(
-        task=task,
-        llm=get_llm(),
-        browser=browser,
-        llm_timeout=60,
-        step_timeout=90,
-    )
-    result = await agent.run(max_steps=max_steps)
-    return result.final_result() or ""
-
-
-async def run_deep_task(task: str, max_steps: int = 35) -> str:
-    """Deep research task — gets its own browser instance for isolation."""
-    browser = _make_browser(keep_alive=False)
-    agent = Agent(
+def _make_agent(task: str, browser: Browser, task_type: str = "") -> Agent:
+    """Create an agent with full human-browsing context injected into every step."""
+    from backend.tools.context import get_system_context
+    return Agent(
         task=task,
         llm=get_llm(),
         browser=browser,
         llm_timeout=60,
         step_timeout=120,
+        extend_system_message=get_system_context(task_type),
     )
+
+
+async def run_browser_task(task: str, task_type: str = "", step_callback=None, max_steps: int = 25) -> str:
+    """Single task using the warm persistent browser."""
+    browser = await get_browser()
+    agent = _make_agent(task, browser, task_type)
     result = await agent.run(max_steps=max_steps)
-    await browser.close()
     return result.final_result() or ""
 
 
-async def run_parallel_tasks(tasks: list[str], max_steps: int = 25) -> list[str]:
-    """Run multiple tasks in parallel — each gets its own browser."""
-    async def _run_one(task: str) -> str:
-        browser = _make_browser(keep_alive=False)
-        agent = Agent(task=task, llm=get_llm(), browser=browser, llm_timeout=60, step_timeout=120)
+async def run_deep_task(task: str, task_type: str = "", max_steps: int = 40) -> str:
+    """Deep research task — own browser instance for isolation."""
+    browser = _make_browser(keep_alive=False)
+    try:
+        agent = _make_agent(task, browser, task_type)
         result = await agent.run(max_steps=max_steps)
-        await browser.close()
         return result.final_result() or ""
+    finally:
+        await browser.close()
 
-    return await asyncio.gather(*[_run_one(t) for t in tasks])
+
+async def run_parallel_tasks(tasks: list[str], task_type: str = "", max_steps: int = 25) -> list[str]:
+    """Run tasks sequentially on the warm shared browser."""
+    browser = await get_browser()
+    results = []
+    for task in tasks:
+        try:
+            agent = _make_agent(task, browser, task_type)
+            result = await agent.run(max_steps=max_steps)
+            results.append(result.final_result() or "")
+        except Exception as e:
+            results.append(f"Error: {e}")
+    return results
 
 
 async def close_browser():

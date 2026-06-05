@@ -1,5 +1,4 @@
 import pdfplumber
-from google import genai
 import json
 from backend.config import settings
 
@@ -10,11 +9,7 @@ def extract_text_from_pdf(pdf_path: str) -> str:
 
 
 def parse_resume(resume_text: str) -> dict:
-    client = genai.Client(api_key=settings.google_api_key)
-
-    response = client.models.generate_content(
-        model="gemini-3.1-flash-lite",
-        contents=f"""Extract the following from this resume and return as JSON:
+    prompt = f"""Extract the following from this resume and return as JSON:
 - name
 - email
 - skills (list, max 10)
@@ -26,10 +21,32 @@ def parse_resume(resume_text: str) -> dict:
 Resume:
 {resume_text}
 
-Return only valid JSON, no markdown.""",
-    )
+Return only valid JSON, no markdown."""
 
-    raw = response.text.strip()
+    raw = ""
+
+    # Try Groq first
+    if settings.groq_api_key:
+        try:
+            from groq import Groq
+            client = Groq(api_key=settings.groq_api_key)
+            r = client.chat.completions.create(
+                model="llama-3.3-70b-versatile",
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0,
+            )
+            raw = r.choices[0].message.content.strip()
+        except Exception:
+            pass
+
+    # Fall back to Gemini
+    if not raw and settings.google_api_key:
+        from google import genai
+        from backend.tools.model_selector import get_working_model
+        client = genai.Client(api_key=settings.google_api_key)
+        r = client.models.generate_content(model=get_working_model(), contents=prompt)
+        raw = r.text.strip()
+
     if raw.startswith("```"):
         raw = raw.split("```")[1]
         if raw.startswith("json"):

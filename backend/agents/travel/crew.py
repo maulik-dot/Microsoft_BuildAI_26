@@ -1,70 +1,51 @@
 from backend.tools.browser import run_deep_task
+from backend.tools.planner import plan_task
 from backend.models.schemas import TravelRequest
-from backend.memory.agent_memory import get_context, update
+from backend.memory.agent_memory import update
 
 
 async def run_travel_booking(request: TravelRequest, step_callback=None) -> dict:
     budget_str = f"under ₹{int(request.budget)}" if request.budget else "best value"
-    nights = ""
-    if request.return_date:
-        nights = f" (checking out {request.return_date})"
+    nights = f", check-out {request.return_date}" if request.return_date else ""
 
-    task = f"""{get_context("travel")}
-You are a thorough travel research agent. Find the best travel options.
+    plan = plan_task(
+        f"Find flights from {request.from_city} to {request.to_city} on {request.departure_date} and hotels in {request.to_city}, budget {budget_str}",
+        "travel"
+    )
 
-TRIP DETAILS:
-- From: {request.from_city}
-- To: {request.to_city}
-- Departure: {request.departure_date}
-- Return: {request.return_date or 'one-way'}
+    task = plan + f"""Find the best travel options for this trip:
+- From: {request.from_city} → To: {request.to_city}
+- Departure: {request.departure_date} | Return: {request.return_date or 'one-way'}
 - Budget: {budget_str}
-- Preferences: {request.preferences or 'cheapest options'}
 
-=== PHASE 1: FLIGHTS ===
+=== FLIGHTS ===
 1. Go to https://www.ixigo.com/flights
-2. Enter: From={request.from_city}, To={request.to_city}, Date={request.departure_date}
-3. Wait for results to fully load
-4. SCROLL through the entire results list — do not stop at first 3
-5. Check the filter panel: apply any "Non-stop" filter if available
-6. For each flight option extract:
-   - Airline name
-   - Exact price (with any taxes shown)
-   - Departure time and arrival time
-   - Duration and stops
-   - Baggage allowance if shown
-   - Booking link
-7. Collect top 5 cheapest AND top 2 fastest options
-8. If prices are above budget, check the "Flexible dates" or fare calendar for cheaper dates ±2 days
+2. Enter From={request.from_city}, To={request.to_city}, Date={request.departure_date}
+3. Wait 3-5 seconds for results — scroll down slowly to load all options
+4. Apply "Non-stop" filter if available
+5. Expand each flight card to read: departure time, arrival time, duration, stops
+6. Collect top 5 cheapest + top 2 fastest flights
+7. If all prices exceed budget, check flexible dates (±2 days)
 
-=== PHASE 2: HOTELS ===
+Each flight:
+| Airline | Price | Departs | Arrives | Duration | Stops |
+
+=== HOTELS ===
 1. Go to https://www.ixigo.com/hotels
 2. Search: City={request.to_city}, Check-in={request.departure_date}{nights}
-3. Wait for results to fully load
-4. SCROLL through at least 20 hotel results
-5. For each hotel extract:
-   - Hotel name and star rating
-   - Price per night (and total for stay)
-   - Location/area in the city
-   - Guest rating (out of 10)
-   - Key amenities (free breakfast, AC, wifi, etc.)
-   - Booking link
-6. Collect top 5 cheapest AND top 2 best-rated options
+3. Sort by Price: Low to High
+4. Scroll through 20+ results
+5. Click each hotel card for: name, price/night, rating, area, amenities
 
-=== PHASE 3: SUMMARY ===
-Present a clean comparison table:
-FLIGHTS:
-| # | Airline | Price | Departure | Duration | Stops |
-...
+Each hotel:
+| Hotel | ₹/night | Rating | Area | Highlights |
 
-HOTELS:
-| # | Hotel | Price/night | Rating | Area | Amenities |
-...
+=== FINAL SUMMARY ===
+RECOMMENDED COMBO: [cheapest flight] + [best value hotel]
+TOTAL COST: ₹X
+SAVINGS TIP: [any cheaper alternatives or date tips found]"""
 
-RECOMMENDED COMBO: [cheapest flight + best value hotel]
-TOTAL ESTIMATED COST: ₹X
-SAVINGS TIP: [any tip found, e.g. flexible date cheaper by ₹X]"""
-
-    result = await run_deep_task(task, max_steps=35)
+    result = await run_deep_task(task, task_type="travel", max_steps=40)
     update("travel", result, success=bool(result))
     return {
         "summary": result,

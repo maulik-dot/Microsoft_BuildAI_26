@@ -1,52 +1,46 @@
-import asyncio
 from backend.tools.browser import run_parallel_tasks
+from backend.tools.planner import plan_task
 from backend.models.schemas import JobRequest
-from backend.memory.agent_memory import get_context, update
+from backend.memory.agent_memory import update
 
-DEEP_PROMPT = """You are a thorough job research agent. Search for jobs on {url}.
+TASK_TEMPLATE = """Search for "{title}" jobs on {url} in {location}.
 
-SEARCH CRITERIA:
-- Job title: {title}
-- Location: {location}
-- Resume summary: {resume}
-
-INSTRUCTIONS — be exhaustive:
-
+SEARCH INSTRUCTIONS:
 1. Go to https://{url}
-2. Search for "{title}" in {location}
-3. SORT results by: Most Recent (click the sort option if available)
-4. SCROLL through at least 2-3 pages of results
-5. For each job listing, click into it and extract:
+2. Type "{title}" in the search bar, set location to "{location}"
+3. Sort by: Most Recent
+4. Scroll through at least 2 pages of results
+5. For each job click into it and extract:
    - Exact job title
-   - Company name + company size/type if shown
+   - Company name + size/type if shown
    - Location (city / remote / hybrid)
-   - Salary range (exact numbers, not ranges if possible)
-   - Experience required (years)
-   - Key skills required
-   - Job description highlights (what they actually need)
+   - Salary range (exact)
+   - Experience required
+   - Key skills required (list all)
+   - Job description highlights
    - Date posted
-   - Application type: Easy Apply / External / Direct
+   - Application type (Easy Apply / External)
    - Direct apply URL
-6. Also try a SECOND search with a variation: "{title_alt}"
-7. Collect top 8 most relevant jobs total
-8. Rank them by: salary → relevance to resume → recency
+6. Also search for "{title_alt}" and add any new results
+7. Collect 8 best matches total, ranked by: salary → recency → relevance
+
+Resume to match against: {resume}
 
 FORMAT each job as:
 ---
 N. [Title] at [Company]
-Location: ... | Salary: ₹X-Y LPA | Experience: X yrs
-Skills needed: ...
-Posted: ... | Apply type: Easy Apply / External
+Location: ... | Salary: ₹X-Y LPA | Exp: X-Y yrs
+Skills: ...
+Posted: ... | Apply: Easy/External
 Why it fits: [one line]
-Apply: [URL]
----
-
-Do not skip any job. Click into each one."""
+URL: [apply link]
+---"""
 
 
 async def run_job_applications(request: JobRequest, step_callback=None) -> dict:
-    platforms = request.platforms or ["naukri", "indeed"]
-    ordered = sorted(platforms, key=lambda p: 0 if p == "naukri" else 1)
+    platforms = request.platforms or ["naukri"]
+    title = request.job_titles[0]
+    title_alt = request.job_titles[1] if len(request.job_titles) > 1 else f"Senior {title}"
 
     platform_urls = {
         "naukri": "naukri.com",
@@ -54,29 +48,25 @@ async def run_job_applications(request: JobRequest, step_callback=None) -> dict:
         "indeed": "indeed.co.in",
     }
 
-    memory_ctx = get_context("jobs")
-    title = request.job_titles[0]
-    title_alt = request.job_titles[1] if len(request.job_titles) > 1 else f"Senior {title}"
-
     tasks = []
-    for p in ordered:
+    for p in platforms:
         url = platform_urls.get(p, p)
-        prompt = memory_ctx + "\n\n" + DEEP_PROMPT.format(
+        plan = plan_task(
+            f"Find {title} jobs in {request.location or 'India'} on {url}",
+            "jobs"
+        )
+        task = plan + TASK_TEMPLATE.format(
             url=url,
             title=title,
             title_alt=title_alt,
             location=request.location or "India",
             resume=(request.resume_text or "Not provided")[:300],
         )
-        tasks.append(prompt)
+        tasks.append(task)
 
-    results = await run_parallel_tasks(tasks, max_steps=28)
+    results = await run_parallel_tasks(tasks, task_type="jobs", max_steps=30)
 
-    sections = []
-    for i, r in enumerate(results):
-        if r:
-            sections.append(f"## {ordered[i].upper()}\n\n{r}")
-
+    sections = [f"## {platforms[i].upper()}\n\n{r}" for i, r in enumerate(results) if r]
     combined = "\n\n---\n\n".join(sections)
     update("jobs", combined, success=bool(combined))
-    return {"summary": combined, "titles": request.job_titles, "platforms": ordered}
+    return {"summary": combined, "titles": request.job_titles, "platforms": platforms}

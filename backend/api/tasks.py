@@ -1,127 +1,141 @@
 from fastapi import APIRouter, BackgroundTasks, UploadFile, File, HTTPException
-from backend.memory.agent_memory import _load as load_memory, add_tip, mark_blocked, mark_works
-from backend.models.schemas import (
-    TravelRequest, JobRequest, PriceMonitorRequest,
-    HackathonRequest, TaskResponse, TaskStatus, TaskType
-)
+from pydantic import BaseModel
+from backend.memory.agent_memory import _load as load_memory, _load_general, add_tip, mark_blocked, mark_works
 from backend.tools.resume_parser import extract_text_from_pdf, parse_resume
 import uuid, os
 
 router = APIRouter(prefix="/tasks", tags=["tasks"])
 
-# In-memory task store (swap for DB in production)
-task_store: dict[str, TaskResponse] = {}
+task_store: dict = {}
 
 
-def _update_task(task_id: str, **kwargs):
+class ResearchRequest(BaseModel):
+    query: str
+
+
+class TaskResponse(BaseModel):
+    task_id: str
+    status: str
+    result: dict | None = None
+    error: str | None = None
+
+
+def _update(task_id: str, **kwargs):
     if task_id in task_store:
-        for k, v in kwargs.items():
-            setattr(task_store[task_id], k, v)
+        task_store[task_id].update(kwargs)
 
 
-@router.post("/travel", response_model=TaskResponse)
-async def start_travel(request: TravelRequest, background_tasks: BackgroundTasks):
+# --- General research endpoint ---
+
+@router.post("/research")
+async def start_research(request: ResearchRequest, background_tasks: BackgroundTasks):
+    from backend.agents.research.agent import run_research
+
+    task_id = str(uuid.uuid4())
+    task_store[task_id] = {"task_id": task_id, "status": "pending", "result": None, "error": None}
+
+    async def run():
+        _update(task_id, status="running")
+        try:
+            result = await run_research(request.query)
+            _update(task_id, status="completed", result=result)
+        except Exception as e:
+            _update(task_id, status="failed", error=str(e))
+
+    background_tasks.add_task(run)
+    return task_store[task_id]
+
+
+# --- Legacy specialized endpoints (kept for direct API use) ---
+
+@router.post("/travel")
+async def start_travel(request: dict, background_tasks: BackgroundTasks):
     from backend.agents.travel.crew import run_travel_booking
+    from backend.models.schemas import TravelRequest
 
     task_id = str(uuid.uuid4())
-    task = TaskResponse(task_id=task_id, task_type=TaskType.TRAVEL, status=TaskStatus.PENDING)
-    task_store[task_id] = task
+    task_store[task_id] = {"task_id": task_id, "status": "pending", "result": None, "error": None}
 
     async def run():
-        _update_task(task_id, status=TaskStatus.RUNNING)
+        _update(task_id, status="running")
         try:
-            result = await run_travel_booking(request)
-            _update_task(task_id, status=TaskStatus.COMPLETED, result=result)
+            result = await run_travel_booking(TravelRequest(**request))
+            _update(task_id, status="completed", result=result)
         except Exception as e:
-            _update_task(task_id, status=TaskStatus.FAILED, error=str(e))
+            _update(task_id, status="failed", error=str(e))
 
     background_tasks.add_task(run)
-    return task
+    return task_store[task_id]
 
 
-@router.post("/jobs", response_model=TaskResponse)
-async def start_jobs(request: JobRequest, background_tasks: BackgroundTasks):
+@router.post("/jobs")
+async def start_jobs(request: dict, background_tasks: BackgroundTasks):
     from backend.agents.jobs.crew import run_job_applications
+    from backend.models.schemas import JobRequest
 
     task_id = str(uuid.uuid4())
-    task = TaskResponse(task_id=task_id, task_type=TaskType.JOBS, status=TaskStatus.PENDING)
-    task_store[task_id] = task
+    task_store[task_id] = {"task_id": task_id, "status": "pending", "result": None, "error": None}
 
     async def run():
-        _update_task(task_id, status=TaskStatus.RUNNING)
+        _update(task_id, status="running")
         try:
-            result = await run_job_applications(request)
-            _update_task(task_id, status=TaskStatus.COMPLETED, result=result)
+            result = await run_job_applications(JobRequest(**request))
+            _update(task_id, status="completed", result=result)
         except Exception as e:
-            _update_task(task_id, status=TaskStatus.FAILED, error=str(e))
+            _update(task_id, status="failed", error=str(e))
 
     background_tasks.add_task(run)
-    return task
+    return task_store[task_id]
 
 
-@router.post("/price-monitor", response_model=TaskResponse)
-async def start_price_monitor(request: PriceMonitorRequest, background_tasks: BackgroundTasks):
+@router.post("/price-monitor")
+async def start_price_monitor(request: dict, background_tasks: BackgroundTasks):
     from backend.agents.price_monitor.crew import check_price
-    from backend.monitoring.scheduler import add_price_monitor
+    from backend.models.schemas import PriceMonitorRequest
 
     task_id = str(uuid.uuid4())
-    task = TaskResponse(task_id=task_id, task_type=TaskType.PRICE_MONITOR, status=TaskStatus.PENDING)
-    task_store[task_id] = task
+    task_store[task_id] = {"task_id": task_id, "status": "pending", "result": None, "error": None}
 
     async def run():
-        _update_task(task_id, status=TaskStatus.RUNNING)
+        _update(task_id, status="running")
         try:
-            result = await check_price(request)
-            add_price_monitor(task_id, request.product_name, request.target_price, request.platforms)
-            _update_task(task_id, status=TaskStatus.COMPLETED, result=result)
+            result = await check_price(PriceMonitorRequest(**request))
+            _update(task_id, status="completed", result=result)
         except Exception as e:
-            _update_task(task_id, status=TaskStatus.FAILED, error=str(e))
+            _update(task_id, status="failed", error=str(e))
 
     background_tasks.add_task(run)
-    return task
+    return task_store[task_id]
 
 
-@router.post("/hackathon", response_model=TaskResponse)
-async def start_hackathon(request: HackathonRequest, background_tasks: BackgroundTasks):
+@router.post("/hackathon")
+async def start_hackathon(request: dict, background_tasks: BackgroundTasks):
     from backend.agents.hackathon.crew import find_hackathons
-    from backend.monitoring.scheduler import add_hackathon_monitor
+    from backend.models.schemas import HackathonRequest
 
     task_id = str(uuid.uuid4())
-    task = TaskResponse(task_id=task_id, task_type=TaskType.HACKATHON, status=TaskStatus.PENDING)
-    task_store[task_id] = task
+    task_store[task_id] = {"task_id": task_id, "status": "pending", "result": None, "error": None}
 
     async def run():
-        _update_task(task_id, status=TaskStatus.RUNNING)
+        _update(task_id, status="running")
         try:
-            result = await find_hackathons(request)
-            add_hackathon_monitor(task_id, request.resume_text, request.skills or [])
-            _update_task(task_id, status=TaskStatus.COMPLETED, result=result)
+            result = await find_hackathons(HackathonRequest(**request))
+            _update(task_id, status="completed", result=result)
         except Exception as e:
-            _update_task(task_id, status=TaskStatus.FAILED, error=str(e))
+            _update(task_id, status="failed", error=str(e))
 
     background_tasks.add_task(run)
-    return task
+    return task_store[task_id]
 
+
+# --- Memory + status endpoints ---
 
 @router.get("/memory")
 async def get_memory():
-    """See everything the agent has learned so far."""
-    return load_memory()
+    return {"task_memory": load_memory(), "general_memory": _load_general()}
 
 
-@router.post("/memory/blocked")
-async def add_blocked(task_type: str, domain: str):
-    mark_blocked(task_type, domain)
-    return {"status": "ok"}
-
-
-@router.post("/memory/works")
-async def add_works(task_type: str, domain: str):
-    mark_works(task_type, domain)
-    return {"status": "ok"}
-
-
-@router.get("/{task_id}", response_model=TaskResponse)
+@router.get("/{task_id}")
 async def get_task(task_id: str):
     if task_id not in task_store:
         raise HTTPException(status_code=404, detail="Task not found")

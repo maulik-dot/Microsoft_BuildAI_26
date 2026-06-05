@@ -1,3 +1,10 @@
+import browser_use.llm.groq.chat as _groq_chat
+_groq_chat.ToolCallingModels.extend([
+    "llama-3.3-70b-versatile",
+    "llama-3.1-70b-versatile",
+    "llama-3.1-8b-instant",
+])
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
