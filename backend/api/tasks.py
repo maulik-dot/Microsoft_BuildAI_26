@@ -185,6 +185,13 @@ async def start_hackathon(request: dict, background_tasks: BackgroundTasks):
 
 # --- Memory + status endpoints ---
 
+@router.get("/knowledge")
+async def get_knowledge():
+    """Full web knowledge base — sites, navigation hints, search patterns, shortcuts."""
+    from backend.tools.learner import _load
+    return _load()
+
+
 @router.get("/evals")
 async def get_evals():
     """Model performance baseline — shows pass rate, confidence, latency per model/task."""

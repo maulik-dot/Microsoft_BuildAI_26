@@ -42,7 +42,8 @@ async def get_browser() -> Browser:
 
 
 def _make_agent(task: str, browser: Browser, task_type: str = "",
-                task_id: str = "", temporal: bool = False) -> Agent:
+                task_id: str = "", temporal: bool = False,
+                learned_ctx: str = "") -> Agent:
     from backend.tools.context import get_system_context
 
     def on_step(browser_state, agent_output, step_number):
@@ -114,8 +115,9 @@ def _make_agent(task: str, browser: Browser, task_type: str = "",
         use_vision=True,               # Screenshot + DOM together
         use_thinking=True,             # Chain-of-thought before every action
 
-        # ── System context: all 7 principles + learned memory ──
-        extend_system_message=get_system_context(task_type, temporal=temporal),
+        # ── System context: all 7 principles + learned memory + site knowledge ──
+        extend_system_message=get_system_context(task_type, temporal=temporal)
+            + ("\n\n" + learned_ctx if learned_ctx else ""),
 
         # ── Step streaming ──
         register_new_step_callback=on_step,
@@ -157,19 +159,35 @@ def _extract_best_result(agent_history) -> str:
 
 async def run_browser_task(task: str, task_type: str = "", task_id: str = "",
                            temporal: bool = False, max_steps: int = 25) -> str:
+    from backend.tools.learner import get_learned_context, learn_from_run
+    learned_ctx = get_learned_context(task)
     browser = await get_browser()
-    agent = _make_agent(task, browser, task_type, task_id, temporal)
-    result = await agent.run(max_steps=max_steps)
-    return _extract_best_result(result)
+    agent = _make_agent(task, browser, task_type, task_id, temporal, learned_ctx)
+    history = await agent.run(max_steps=max_steps)
+    result = _extract_best_result(history)
+    steps = _step_logs.get(task_id, [])
+    learn_from_run(task, steps, result, success=bool(result and len(result) > 80))
+    return result
 
 
 async def run_deep_task(task: str, task_type: str = "", task_id: str = "",
                         temporal: bool = False, max_steps: int = 35) -> str:
+    from backend.tools.learner import get_learned_context, learn_from_run
+
+    # Inject what agent has learned from previous runs
+    learned_ctx = get_learned_context(task)
+
     browser = _make_browser(keep_alive=False)
     try:
-        agent = _make_agent(task, browser, task_type, task_id, temporal)
-        result = await agent.run(max_steps=max_steps)
-        return _extract_best_result(result)
+        agent = _make_agent(task, browser, task_type, task_id, temporal, learned_ctx)
+        history = await agent.run(max_steps=max_steps)
+        result = _extract_best_result(history)
+
+        # Learn from this run — update web knowledge base
+        steps = _step_logs.get(task_id, [])
+        learn_from_run(task, steps, result, success=bool(result and len(result) > 80))
+
+        return result
     finally:
         await browser.close()
 
