@@ -148,10 +148,26 @@ TEMPORAL_FILTER_BLOCK = """
 SITE_KNOWLEDGE = """
 ## SITE-SPECIFIC NAVIGATION KNOWLEDGE
 
-### Google Search
-- Search bar: center on homepage, top on results
-- After results load: look for "Tools" button to filter by date
-- Shopping tab: click for price comparisons across retailers
+### Google Search — Precision Operators
+Use these operators to get better results immediately:
+
+| Operator | Example | Use when |
+|----------|---------|----------|
+| `site:X` | `site:naukri.com python developer` | restrict to one domain |
+| `"phrase"` | `"best laptop under 40000"` | exact phrase must appear |
+| `-word` | `laptop review -sponsored` | exclude irrelevant results |
+| `after:YYYY-MM-DD` | `after:2025-01-01` | only recent results |
+| `intitle:X` | `intitle:"price comparison"` | keyword in page title |
+| `A..B` | `₹30000..₹50000 laptop` | number range |
+| `OR` | `site:flipkart.com OR site:amazon.in` | search multiple sites |
+
+WHEN TO USE OPERATORS:
+- Always add `after:{current_year-1}-01-01` when user asks for "latest/new/recent"
+- Add `site:` when you know which site has the best data
+- Add `-quora.com -reddit.com` when you want official sources, not forums
+- Use `"exact phrase"` for product names, course titles, job titles
+
+After search results load: click Tools → Any time → Past year for recency filtering.
 
 ### Ixigo (ixigo.com)
 - Flights: From/To fields at top, click and type city, select from dropdown

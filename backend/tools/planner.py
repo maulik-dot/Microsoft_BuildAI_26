@@ -20,22 +20,32 @@ def _call_llm(prompt: str, task_type: str = "planning") -> str:
 
 
 def plan_research(query: str) -> str:
-    """Generate a web research strategy. Uses SMALL model — planning is structured."""
-    result = _call_llm(f"""You are a research strategist. For this query, write a concise step-by-step web research plan.
+    """
+    Generate a web research strategy with engineered search queries.
+    Combines LLM planning with precision Google operator injection.
+    """
+    from backend.tools.query_engineer import engineer_search_plan
+
+    # Build engineered queries (operators, multi-angle, hypothetical)
+    search_plan = engineer_search_plan(query)
+
+    # LLM adds the step-by-step execution logic on top
+    result = _call_llm(f"""You are a research strategist. A search engineer has already prepared precision queries for this research task. Your job is to write the EXECUTION steps.
 
 QUERY: {query}
 
-Write a numbered plan (max 8 steps) covering:
-1. Best Google search queries to use (give exact query strings)
-2. Which websites/sources to visit (be specific: site names, URLs)
-3. What to look for on each page
-4. How to cross-reference or verify the information
-5. What the final structured answer should contain
+PREPARED SEARCHES (use these exact queries in order):
+{search_plan}
 
-Be specific — give exact search terms, exact site names. No generic advice.
-Return ONLY the numbered plan.""", task_type="planning")
+Write a numbered execution plan (max 6 steps) covering:
+1. Which prepared query to use first and why
+2. What to look for and extract from each page
+3. How to cross-reference results across sources
+4. What the final structured answer must contain
 
-    return f"## RESEARCH PLAN\n{result}\n\n## BEGIN RESEARCH\n" if result else ""
+Be specific. Reference the exact queries above. Return ONLY the numbered plan.""", task_type="planning")
+
+    return f"{search_plan}\n## EXECUTION PLAN\n{result}\n\n## BEGIN RESEARCH\n" if result else search_plan
 
 
 def plan_task(goal: str, task_type: str) -> str:
