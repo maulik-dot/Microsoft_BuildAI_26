@@ -916,24 +916,7 @@ main {
           Like the wind god who moves through all realms unseen — Vayu browses, extracts, and synthesises anything from across the web.
         </div>
 
-        <div class="suggestions">
-          <div class="sugg" onclick="useSugg(this)">
-            <span class="sugg-icon">→</span>
-            <span>Find flights Mumbai → Delhi, June 15, under ₹8000 with hotel options</span>
-          </div>
-          <div class="sugg" onclick="useSugg(this)">
-            <span class="sugg-icon">→</span>
-            <span>Python developer jobs in Mumbai on Naukri — salary, skills, apply links</span>
-          </div>
-          <div class="sugg" onclick="useSugg(this)">
-            <span class="sugg-icon">→</span>
-            <span>Samsung Galaxy S24 under ₹55,000 — compare Flipkart vs Amazon prices</span>
-          </div>
-          <div class="sugg" onclick="useSugg(this)">
-            <span class="sugg-icon">→</span>
-            <span>Top hackathons for a BTech CSE engineer skilled in Python &amp; ML</span>
-          </div>
-        </div>
+        <div class="suggestions" id="suggestions-grid"></div>
       </div>
 
     </div>
@@ -1484,6 +1467,65 @@ async function loadKnowledge() {
   } catch(e) { el.textContent = 'Failed to load'; }
 }
 
+// ── SUGGESTION POOL — 4 random picked on every page load ─────────────
+const ALL_SUGGESTIONS = [
+  // Travel
+  'Find flights from Mumbai to Delhi on June 20 under ₹8000 with hotel options',
+  'Cheapest flights from Bangalore to Goa this weekend',
+  'Find budget hotels in Jaipur under ₹2000 per night near the city centre',
+  'Compare flight prices Mumbai to London in July across booking sites',
+  'Find a 3-day trip itinerary to Manali with transport and stay options',
+
+  // Jobs
+  'Python developer jobs in Bangalore with salary above 15 LPA on Naukri',
+  'Remote frontend React developer jobs in India — latest postings',
+  'Data scientist jobs in Hyderabad with 2-4 years experience required',
+  'Full stack developer jobs in Mumbai — salary, skills, easy apply',
+  'Find product manager roles at Indian startups hiring right now',
+
+  // Price comparison
+  'Samsung Galaxy S24 under ₹55,000 — compare Flipkart vs Amazon prices',
+  'Best price for boAt Airdopes 141 across all Indian e-commerce sites',
+  'Compare MacBook Air M2 prices across Flipkart, Amazon, and Croma',
+  'iPhone 15 128GB cheapest price in India right now',
+  'Best budget laptops under ₹40,000 — top rated on Flipkart and Amazon',
+
+  // Hackathons
+  'Top hackathons for a BTech CSE engineer skilled in Python and ML',
+  'Find AI and machine learning hackathons open for registration on Devfolio',
+  'Upcoming coding competitions with cash prizes for college students',
+  'Find hackathons on Unstop suitable for a web developer',
+  'Best hackathons happening in June 2026 with online participation',
+
+  // Courses
+  'Best Django course under ₹999 on Udemy and a free YouTube playlist',
+  'Top-rated React JS course for beginners under ₹500 on Udemy',
+  'Free machine learning courses with certificates in 2026',
+  'Best Python course for data science — compare Coursera and Udemy',
+
+  // General research
+  'What are the top AI startups in India raising funding in 2026?',
+  'Compare iPhone 15 vs Samsung S24 — which is better value in India?',
+  'Latest news about OpenAI GPT-5 release date and features',
+  'Best free tools for building a personal portfolio website in 2026',
+  'Top 5 books on system design recommended by senior engineers',
+];
+
+function loadSuggestions() {
+  const grid = document.getElementById('suggestions-grid');
+  if (!grid) return;
+
+  // Shuffle and pick 4
+  const shuffled = [...ALL_SUGGESTIONS].sort(() => Math.random() - 0.5);
+  const picked = shuffled.slice(0, 4);
+
+  grid.innerHTML = picked.map(text => `
+    <div class="sugg" onclick="useSugg(this)">
+      <span class="sugg-icon">→</span>
+      <span>${text}</span>
+    </div>`).join('');
+}
+
 function useSugg(card) {
   const text = card.querySelector('span:last-child').innerText.trim();
   const el = document.getElementById('qinput');
@@ -1520,6 +1562,9 @@ function esc(s) {
 }
 
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+// Load random suggestions on startup
+loadSuggestions();
 </script>
 </body>
 </html>
