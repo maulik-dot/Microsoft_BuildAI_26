@@ -3,9 +3,17 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Agentic Web</title>
+<title>Vayu</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Abril+Fatface&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  @font-face {
+    font-family: 'KarmaticArcade';
+    src: url('/static/ka1.ttf') format('truetype');
+    font-weight: normal;
+    font-style: normal;
+  }
+</style>
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -215,8 +223,8 @@ header {
 }
 
 .logo-name {
-  font-family: 'Abril Fatface', serif;
-  font-size: 38px;
+  font-family: 'KarmaticArcade', 'Abril Fatface', serif;
+  font-size: 32px;
   font-weight: 400;
   line-height: 1;
   letter-spacing: 1px;
@@ -869,9 +877,9 @@ main {
 
   <!-- Center: big logo + Blackletter title -->
   <div class="logo">
-    <img src="/static/logo.png" alt="Agentic Web" class="logo-img">
-    <div class="logo-name">Agentic Web</div>
-    <div class="logo-tag">autonomous · web · agent</div>
+    <img src="/static/logo.png" alt="Vayu" class="logo-img">
+    <div class="logo-name">Vayu</div>
+    <div class="logo-tag">the wind that knows everything</div>
   </div>
 
   <!-- Right: buttons -->
@@ -900,8 +908,7 @@ main {
         </div>
         <div class="empty-title">What do you want to research?</div>
         <div class="empty-sub">
-          An autonomous agent that browses, extracts, and synthesises information from across the web.<br>
-          Ask anything — it will find it.
+          Like the wind god who moves through all realms unseen — Vayu browses, extracts, and synthesises anything from across the web.
         </div>
 
         <div class="suggestions">
@@ -933,7 +940,7 @@ main {
     <div class="input-wrap">
       <div class="input-top">
         <textarea id="qinput" rows="1"
-          placeholder="Ask anything — the agent will research it for you…"
+          placeholder="Ask Vayu anything — it will find it across the web…"
           onkeydown="handleKey(event)" oninput="resize(this)"></textarea>
       </div>
       <div class="input-bot">
@@ -1082,7 +1089,7 @@ function startThinking(taskId) {
   wrap.innerHTML = `
     <div class="msg-meta">
       <div class="avatar"><img src="/static/logo.png" style="width:22px;height:22px;object-fit:contain;filter:drop-shadow(0 0 4px rgba(200,149,106,0.4))"></div>
-      <span>Agentic Web</span>
+      <span>Vayu</span>
     </div>
     <div class="thinking-wrap">
       <div class="thinking-bubble">
@@ -1195,7 +1202,7 @@ function addClarify(taskId, question) {
   el.innerHTML = `
     <div class="msg-meta">
       <div class="avatar"><img src="/static/logo.png" style="width:22px;height:22px;object-fit:contain"></div>
-      <span>Agentic Web</span>
+      <span>Vayu</span>
     </div>
     <div class="clarify-bubble">
       <div class="clarify-hdr">Clarification needed</div>
@@ -1277,7 +1284,7 @@ function addAgentMsg(md) {
   el.innerHTML = `
     <div class="msg-meta">
       <div class="avatar"><img src="/static/logo.png" style="width:22px;height:22px;object-fit:contain"></div>
-      <span>Agentic Web</span>
+      <span>Vayu</span>
       <span style="margin-left:auto;color:var(--text3)">${ts()}</span>
     </div>
     <div class="bubble"><div class="md-content">${marked.parse(md||'')}</div></div>
@@ -1293,7 +1300,7 @@ function addErrorMsg(msg) {
   el.innerHTML = `
     <div class="msg-meta">
       <div class="avatar"><img src="/static/logo.png" style="width:22px;height:22px;object-fit:contain"></div>
-      <span>Agentic Web</span>
+      <span>Vayu</span>
     </div>
     <div class="bubble" style="border-color:rgba(248,113,113,.25);background:rgba(248,113,113,.04)">
       <strong style="color:var(--red);font-size:14px;">Error</strong><br>

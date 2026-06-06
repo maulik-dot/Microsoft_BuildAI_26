@@ -25,8 +25,8 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="Agentic Web",
-    description="Autonomous web agents for travel, jobs, price monitoring, and hackathon discovery",
+    title="Vayu",
+    description="Vayu — the autonomous web agent that moves through the internet like wind, finding anything for you.",
     version="1.0.0",
     lifespan=lifespan,
 )
