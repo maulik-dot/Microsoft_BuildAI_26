@@ -2,11 +2,13 @@ from fastapi import APIRouter, BackgroundTasks, UploadFile, File, HTTPException
 from pydantic import BaseModel
 from backend.memory.agent_memory import _load as load_memory, _load_general, add_tip, mark_blocked, mark_works
 from backend.tools.resume_parser import extract_text_from_pdf, parse_resume
-import uuid, os
+import uuid, os, asyncio
 
 router = APIRouter(prefix="/tasks", tags=["tasks"])
 
 task_store: dict = {}
+# Maps task_id → asyncio.Task so we can cancel it
+_running_tasks: dict[str, asyncio.Task] = {}
 
 
 class ResearchRequest(BaseModel):
@@ -48,9 +50,13 @@ async def start_research(request: ResearchRequest, background_tasks: BackgroundT
     _new_task(task_id)
 
     async def run():
+        # Register this coroutine as a cancellable task
+        current = asyncio.current_task()
+        if current:
+            _running_tasks[task_id] = current
+
         _update(task_id, status="running")
         try:
-            import asyncio
             from backend.tools.task_router import route, classify
             from backend.tools.context_resolver import resolve_query
 
@@ -76,11 +82,37 @@ async def start_research(request: ResearchRequest, background_tasks: BackgroundT
                     result=result,
                     confidence=result.get("confidence", 50),
                     needs_review=result.get("needs_review", False))
+        except asyncio.CancelledError:
+            _update(task_id, status="stopped", error="Stopped by user.")
         except Exception as e:
             _update(task_id, status="failed", error=str(e))
+        finally:
+            _running_tasks.pop(task_id, None)
 
     background_tasks.add_task(run)
     return task_store[task_id]
+
+
+@router.post("/{task_id}/stop")
+async def stop_task(task_id: str):
+    """Cancel a running task immediately."""
+    if task_id not in task_store:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    task = _running_tasks.get(task_id)
+    if task and not task.done():
+        task.cancel()
+        _update(task_id, status="stopped", error="Stopped by user.")
+        # Also stop the browser agent if mid-run
+        try:
+            from backend.tools.browser import get_steps, clear_steps
+            clear_steps(task_id)
+        except Exception:
+            pass
+        return {"status": "stopped"}
+
+    status = task_store[task_id].get("status", "unknown")
+    return {"status": status, "message": "Task was not running"}
 
 
 @router.post("/{task_id}/answer")

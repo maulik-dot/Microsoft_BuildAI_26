@@ -1073,10 +1073,12 @@ main {
           </button>
           <input type="file" id="file-input" accept=".pdf" onchange="uploadResume(event)">
           <button id="send" onclick="send()">
-            Send
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-              <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/>
-            </svg>
+            <span id="send-label">Send</span>
+            <span id="send-icon">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/>
+              </svg>
+            </span>
           </button>
         </div>
       </div>
@@ -1166,6 +1168,7 @@ async function send() {
       body: JSON.stringify({query, context: chatHistory.slice(0, -1)})
     });
     const task = await r.json();
+    _currentTaskId = task.task_id;
     startThinking(task.task_id);
     await poll(task.task_id);
   } catch(e) {
@@ -1284,6 +1287,12 @@ async function poll(taskId) {
     if (task.status === 'failed') {
       stopThinking();
       addErrorMsg(task.error || 'The agent encountered an error. Please try again.');
+      setBusy(false);
+      return;
+    }
+
+    if (task.status === 'stopped') {
+      stopThinking();
       setBusy(false);
       return;
     }
@@ -1768,9 +1777,46 @@ function scrollDown() {
   document.getElementById('chat').scrollTop = document.getElementById('chat').scrollHeight;
 }
 
+let _currentTaskId = null;
+
 function setBusy(v) {
   busy = v;
-  document.getElementById('send').disabled = v;
+  const btn = document.getElementById('send');
+  const label = document.getElementById('send-label');
+  const icon = document.getElementById('send-icon');
+  if (v) {
+    // Transform to Stop button
+    btn.disabled = false;
+    btn.onclick = stopAgent;
+    btn.style.background = 'linear-gradient(135deg, #ef4444, #dc2626)';
+    btn.style.boxShadow = '0 2px 14px rgba(239,68,68,0.4)';
+    label.textContent = 'Stop';
+    icon.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+      <rect x="4" y="4" width="16" height="16" rx="2"/>
+    </svg>`;
+  } else {
+    // Restore Send button
+    _currentTaskId = null;
+    btn.onclick = send;
+    btn.style.background = '';
+    btn.style.boxShadow = '';
+    btn.disabled = false;
+    label.textContent = 'Send';
+    icon.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+      <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/>
+    </svg>`;
+  }
+}
+
+async function stopAgent() {
+  if (!_currentTaskId) { setBusy(false); return; }
+  try {
+    await fetch(`${API}/tasks/${_currentTaskId}/stop`, { method: 'POST' });
+  } catch {}
+  stopThinking();
+  addErrorMsg('Stopped. You can ask a new question.');
+  setBusy(false);
+  _currentTaskId = null;
 }
 
 function toast(msg) {
