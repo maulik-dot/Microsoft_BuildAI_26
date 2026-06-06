@@ -1055,6 +1055,17 @@ main {
           <kbd>Enter</kbd> send &nbsp;·&nbsp; <kbd>⇧ Enter</kbd> newline
         </div>
         <div class="input-acts">
+          <!-- Model status pill -->
+          <button id="model-pill" onclick="toggleTrainPanel()" title="Model status"
+            style="display:flex;align-items:center;gap:5px;padding:4px 10px;border-radius:20px;
+            border:1px solid rgba(0,200,255,0.25);background:rgba(0,200,255,0.06);
+            color:var(--accent);font-size:11px;font-family:var(--mono);cursor:pointer;
+            transition:all .2s;white-space:nowrap;">
+            <span id="model-pill-dot" style="width:6px;height:6px;border-radius:50%;
+              background:var(--green);box-shadow:0 0 5px var(--green);flex-shrink:0;"></span>
+            <span id="model-pill-label">AI</span>
+          </button>
+
           <button class="attach-btn" onclick="document.getElementById('file-input').click()" title="Upload resume">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
@@ -1089,27 +1100,15 @@ main {
     </button>
   </div>
 
-  <!-- TAB SWITCHER -->
-  <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:5px;margin-bottom:16px;">
-    <button onclick="switchTab('models')" id="tab-models"
-      style="padding:8px;border-radius:7px;border:1px solid var(--accent);
-      background:var(--accent-dim);color:var(--accent);font-size:12px;font-weight:600;
-      cursor:pointer;font-family:var(--font);transition:all .15s;">
-      Models
-    </button>
-    <button onclick="switchTab('view')" id="tab-view"
-      style="padding:8px;border-radius:7px;border:1px solid var(--border);
-      background:none;color:var(--text2);font-size:12px;font-weight:600;
-      cursor:pointer;font-family:var(--font);transition:all .15s;">
-      What I Know
-    </button>
-  </div>
-
   <div style="font-size:11.5px;color:var(--text3);margin-bottom:16px;line-height:1.6;
     padding:10px 12px;background:var(--accent-dim);border-radius:7px;
-    border-left:2px solid rgba(200,149,106,0.3);">
-    The agent self-trains after every search. It automatically learns which sites work, which to avoid, and the best navigation patterns.
+    border-left:2px solid rgba(0,200,255,0.3);">
+    The agent self-trains after every search — learns which sites work, navigation patterns, and best search queries automatically.
   </div>
+
+  <!-- hidden tab stubs for JS compat -->
+  <div id="tab-models" style="display:none"></div>
+  <div id="tab-view" style="display:none"></div>
 
   <!-- MODELS TAB -->
   <div id="pane-models">
@@ -1130,21 +1129,8 @@ main {
       border:1px solid var(--border);font-size:11px;color:var(--text3);font-family:var(--mono);line-height:1.6;"></div>
   </div>
 
-  <!-- VIEW TAB -->
-  <div id="pane-view" style="display:none">
-    <button onclick="loadKnowledge()" style="width:100%;padding:9px;border-radius:7px;
-      border:1px solid var(--border);background:none;color:var(--text2);font-family:var(--font);
-      font-size:12.5px;cursor:pointer;margin-bottom:12px;transition:all .15s;"
-      onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background='none'">
-      ⟳ Refresh knowledge
-    </button>
-    <div id="knowledge-view" style="font-size:11.5px;color:var(--text2);font-family:var(--mono);
-      background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:14px;
-      max-height:calc(100vh - 200px);overflow-y:auto;white-space:pre-wrap;
-      word-break:break-all;line-height:1.6;">
-      Click Refresh to load...
-    </div>
-  </div>
+  <!-- VIEW TAB (hidden, kept for JS compat) -->
+  <div id="pane-view" style="display:none"><div id="knowledge-view"></div></div>
 </div>
 
 <script>
@@ -1807,6 +1793,29 @@ function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 currentChatId = genId();
 loadSuggestions();
 renderChatList();
+
+// Populate model pill in input bar
+(async () => {
+  try {
+    const r = await fetch(`${API}/tasks/models`);
+    const d = await r.json();
+    const avail = (d.models || []).filter(m => m.status === 'available');
+    const primary = avail.find(m => m.is_primary && m.tier === 'large')
+                 || avail.find(m => m.tier === 'large')
+                 || avail[0];
+    const dot = document.getElementById('model-pill-dot');
+    const label = document.getElementById('model-pill-label');
+    if (primary && dot && label) {
+      dot.style.background = 'var(--green)';
+      dot.style.boxShadow = '0 0 5px var(--green)';
+      label.textContent = primary.model.replace('gemini-','').replace('-flash','').replace('-lite','') + ' ·  ready';
+    } else if (dot && label) {
+      dot.style.background = 'var(--red)';
+      dot.style.boxShadow = '0 0 5px var(--red)';
+      label.textContent = 'quota exhausted';
+    }
+  } catch {}
+})();
 </script>
 </body>
 </html>
