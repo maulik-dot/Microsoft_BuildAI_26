@@ -855,6 +855,108 @@ main {
 
 #toast.show { opacity: 1; }
 
+/* ── SIDEBAR ─────────────────────────────────────────────────────────── */
+#sidebar {
+  position: fixed; top: 0; left: -280px; width: 280px; height: 100vh;
+  background: rgba(8,10,20,0.97);
+  border-right: 1px solid rgba(0,200,255,0.12);
+  z-index: 200; display: flex; flex-direction: column;
+  transition: left 0.28s cubic-bezier(0.4,0,0.2,1);
+  backdrop-filter: blur(20px);
+  box-shadow: 4px 0 32px rgba(0,0,0,0.6);
+}
+
+#sidebar.open { left: 0; }
+
+#sidebar-overlay {
+  display: none; position: fixed; inset: 0; z-index: 199;
+  background: rgba(0,0,0,0.5); backdrop-filter: blur(2px);
+}
+
+#sidebar-overlay.show { display: block; }
+
+.sidebar-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 20px 16px 14px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.sidebar-title {
+  font-size: 13px; font-weight: 600; color: var(--text2);
+  text-transform: uppercase; letter-spacing: 0.8px;
+  font-family: var(--mono);
+}
+
+.sidebar-new {
+  display: flex; align-items: center; gap: 5px;
+  padding: 6px 12px; border-radius: var(--r-sm);
+  border: 1px solid rgba(0,200,255,0.3);
+  background: rgba(0,200,255,0.08);
+  color: var(--accent); cursor: pointer;
+  font-size: 12px; font-weight: 600;
+  font-family: var(--font); transition: all 0.15s;
+}
+
+.sidebar-new:hover {
+  background: rgba(0,200,255,0.16);
+  box-shadow: 0 0 12px rgba(0,200,255,0.3);
+}
+
+#chat-list {
+  flex: 1; overflow-y: auto; padding: 10px 8px;
+}
+
+#chat-list::-webkit-scrollbar { width: 3px; }
+#chat-list::-webkit-scrollbar-thumb { background: var(--border2); }
+
+.chat-item {
+  padding: 10px 12px; border-radius: var(--r-md);
+  cursor: pointer; margin-bottom: 3px;
+  transition: all 0.15s; border: 1px solid transparent;
+  position: relative;
+}
+
+.chat-item:hover {
+  background: var(--surface2);
+  border-color: var(--border);
+}
+
+.chat-item.active {
+  background: rgba(0,200,255,0.07);
+  border-color: rgba(0,200,255,0.2);
+}
+
+.chat-item-title {
+  font-size: 13px; color: var(--text);
+  font-weight: 500; line-height: 1.35;
+  white-space: nowrap; overflow: hidden;
+  text-overflow: ellipsis; max-width: 200px;
+}
+
+.chat-item.active .chat-item-title { color: var(--accent); }
+
+.chat-item-meta {
+  font-size: 10.5px; color: var(--text3);
+  margin-top: 3px; font-family: var(--mono);
+  display: flex; align-items: center; justify-content: space-between;
+}
+
+.chat-item-delete {
+  background: none; border: none; color: var(--text3);
+  cursor: pointer; font-size: 13px; padding: 0 2px;
+  opacity: 0; transition: opacity 0.15s, color 0.15s;
+  line-height: 1;
+}
+
+.chat-item:hover .chat-item-delete { opacity: 1; }
+.chat-item-delete:hover { color: var(--red); }
+
+.sidebar-empty {
+  text-align: center; padding: 40px 16px;
+  color: var(--text3); font-size: 13px; line-height: 1.6;
+}
+
 /* ── RESPONSIVE ──────────────────────────────────────────────────────── */
 @media (max-width: 640px) {
   header { padding: 0 14px; }
@@ -872,12 +974,34 @@ main {
 <!-- Glowing background watermark logo -->
 <img id="bg-logo" src="/static/logo.png" alt="">
 
+<!-- SIDEBAR -->
+<div id="sidebar">
+  <div class="sidebar-header">
+    <span class="sidebar-title">Conversations</span>
+    <button class="sidebar-new" onclick="newChat()" title="New chat">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
+      New
+    </button>
+  </div>
+  <div id="chat-list"></div>
+</div>
+
+<!-- SIDEBAR OVERLAY (mobile) -->
+<div id="sidebar-overlay" onclick="toggleSidebar()"></div>
+
 <!-- HEADER -->
 <header>
-  <!-- Left: status pill -->
-  <div class="header-status" style="justify-self:start;">
-    <div class="status-dot"></div>
-    <span>online</span>
+  <!-- Left: sidebar toggle + status -->
+  <div style="display:flex;align-items:center;gap:10px;justify-self:start;">
+    <button class="btn-icon" onclick="toggleSidebar()" title="Conversations" id="sidebar-btn">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+        <path d="M3 12h18M3 6h18M3 18h18"/>
+      </svg>
+    </button>
+    <div class="header-status">
+      <div class="status-dot"></div>
+      <span>online</span>
+    </div>
   </div>
 
   <!-- Center: big logo + Blackletter title -->
@@ -892,11 +1016,6 @@ main {
     <button class="btn-icon" onclick="toggleTrainPanel()" title="Models & Knowledge">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/>
-      </svg>
-    </button>
-    <button class="btn-icon" onclick="newChat()" title="New conversation">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <path d="M12 5v14M5 12h14"/>
       </svg>
     </button>
   </div>
@@ -1171,6 +1290,7 @@ async function poll(taskId) {
       addAgentMsg(displayText);
       chatHistory.push({role: "agent", content: displayText.slice(0, 2000)});
       if (chatHistory.length > MAX_HISTORY) chatHistory = chatHistory.slice(-MAX_HISTORY);
+      _saveAfterReply();
       setBusy(false);
       return;
     }
@@ -1309,9 +1429,129 @@ function copyMsg(btn) {
   setTimeout(() => btn.textContent = 'Copy', 1600);
 }
 
+// ── CHAT SESSION MANAGEMENT (localStorage) ────────────────────────────
+
+let currentChatId = null;
+
+function genId() {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+}
+
+function getSessions() {
+  try { return JSON.parse(localStorage.getItem('vayu_sessions') || '[]'); }
+  catch { return []; }
+}
+
+function saveSessions(sessions) {
+  localStorage.setItem('vayu_sessions', JSON.stringify(sessions));
+}
+
+function saveCurrentChat() {
+  if (!currentChatId) return;
+  const sessions = getSessions();
+  const idx = sessions.findIndex(s => s.id === currentChatId);
+  const messages = chatHistory;
+  if (!messages.length) return;
+
+  const session = {
+    id: currentChatId,
+    title: messages[0]?.content?.slice(0, 60) || 'New chat',
+    updated: Date.now(),
+    messages,
+    html: document.getElementById('ci').innerHTML,
+  };
+
+  if (idx >= 0) sessions[idx] = session;
+  else sessions.unshift(session);
+  saveSessions(sessions.slice(0, 50)); // keep last 50
+}
+
 function newChat() {
+  saveCurrentChat();
+  currentChatId = genId();
   chatHistory = [];
-  window.location.reload();
+  resumeProfile = null;
+  document.getElementById('profile-bar').innerHTML = '';
+  document.getElementById('ci').innerHTML = '';
+  // Re-show empty state
+  const es = document.createElement('div');
+  es.id = 'empty-state';
+  es.innerHTML = `
+    <div class="empty-orb"><img src="/static/logo.png" style="width:42px;height:42px;object-fit:contain;filter:drop-shadow(0 0 12px rgba(0,200,255,0.45))"></div>
+    <div class="empty-title">What do you want to research?</div>
+    <div class="empty-sub">Like the wind god who moves through all realms unseen — Vayu browses, extracts, and synthesises anything from across the web.</div>
+    <div class="suggestions" id="suggestions-grid"></div>`;
+  document.getElementById('ci').appendChild(es);
+  loadSuggestions();
+  renderChatList();
+  closeSidebar();
+  document.getElementById('qinput').focus();
+}
+
+function loadChat(id) {
+  saveCurrentChat();
+  const sessions = getSessions();
+  const session = sessions.find(s => s.id === id);
+  if (!session) return;
+
+  currentChatId = id;
+  chatHistory = session.messages || [];
+  document.getElementById('ci').innerHTML = session.html || '';
+  // Hide empty state if messages exist
+  if (chatHistory.length) {
+    const es = document.getElementById('empty-state');
+    if (es) es.style.display = 'none';
+  }
+  scrollDown();
+  renderChatList();
+  closeSidebar();
+}
+
+function deleteChat(id, e) {
+  e.stopPropagation();
+  const sessions = getSessions().filter(s => s.id !== id);
+  saveSessions(sessions);
+  if (currentChatId === id) newChat();
+  else renderChatList();
+}
+
+function renderChatList() {
+  const sessions = getSessions();
+  const list = document.getElementById('chat-list');
+  if (!sessions.length) {
+    list.innerHTML = `<div class="sidebar-empty">No previous conversations.<br>Start a new chat to begin.</div>`;
+    return;
+  }
+  list.innerHTML = sessions.map(s => {
+    const active = s.id === currentChatId ? ' active' : '';
+    const time = new Date(s.updated).toLocaleDateString('en-IN', {day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
+    const msgCount = (s.messages || []).length;
+    return `<div class="chat-item${active}" onclick="loadChat('${s.id}')">
+      <div class="chat-item-title">${esc(s.title)}</div>
+      <div class="chat-item-meta">
+        <span>${time} · ${msgCount} msgs</span>
+        <button class="chat-item-delete" onclick="deleteChat('${s.id}',event)" title="Delete">✕</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function toggleSidebar() {
+  const sb = document.getElementById('sidebar');
+  const ov = document.getElementById('sidebar-overlay');
+  const open = sb.classList.toggle('open');
+  ov.classList.toggle('show', open);
+  if (open) renderChatList();
+}
+
+function closeSidebar() {
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('sidebar-overlay').classList.remove('show');
+}
+
+// Auto-save on every agent reply
+function _saveAfterReply() {
+  setTimeout(saveCurrentChat, 500);
 }
 
 function toggleTrainPanel() {
@@ -1563,8 +1803,10 @@ function esc(s) {
 
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
-// Load random suggestions on startup
+// Initialise session and suggestions on startup
+currentChatId = genId();
 loadSuggestions();
+renderChatList();
 </script>
 </body>
 </html>
