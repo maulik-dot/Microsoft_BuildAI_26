@@ -5,790 +5,831 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Agentic Web</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=IBM+Plex+Mono:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <style>
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-  :root {
-    --bg:      #06060f;
-    --bg2:     #0a0a18;
-    --bg3:     #0e0e1e;
-    --bg4:     #13132a;
-    --surface: rgba(255,255,255,0.03);
-    --surface2:rgba(255,255,255,0.06);
-    --border:  rgba(255,255,255,0.07);
-    --border2: rgba(255,255,255,0.12);
-
-    --blue:    #3b82f6;
-    --blue-dim:rgba(59,130,246,0.12);
-    --blue-glow:rgba(59,130,246,0.25);
-    --amber:   #f59e0b;
-    --amber-dim:rgba(245,158,11,0.12);
-    --green:   #22c55e;
-    --red:     #ef4444;
-    --orange:  #f97316;
-
-    --text:  #f1f5f9;
-    --text2: #8892a4;
-    --text3: #3f4a5e;
-    --text4: #1e2535;
-
-    /* keep these aliases for inline training panel styles */
-    --cyan:     #3b82f6;
-    --cyan-dim: rgba(59,130,246,0.12);
-    --purple:   #6366f1;
-
-    --font: 'Outfit', system-ui, sans-serif;
-    --mono: 'IBM Plex Mono', 'Courier New', monospace;
-
-    --r-sm: 6px;
-    --r-md: 10px;
-    --r-lg: 14px;
-    --r-xl: 18px;
-  }
-
-  html, body { height: 100%; }
-
-  body {
-    font-family: var(--font);
-    background: var(--bg);
-    color: var(--text);
-    overflow: hidden;
-    height: 100vh;
-    display: flex;
-    flex-direction: column;
-    font-size: 14px;
-    -webkit-font-smoothing: antialiased;
-  }
-
-  /* ── BACKGROUND ── */
-  body::before {
-    content: '';
-    position: fixed; inset: 0; z-index: 0; pointer-events: none;
-    background:
-      radial-gradient(ellipse 70% 60% at 15% 0%, rgba(59,130,246,0.06) 0%, transparent 55%),
-      radial-gradient(ellipse 50% 50% at 85% 100%, rgba(99,102,241,0.05) 0%, transparent 50%),
-      radial-gradient(ellipse 40% 30% at 50% 50%, rgba(6,6,15,0) 0%, rgba(6,6,15,0.4) 100%);
-  }
-
-  /* Subtle scanline texture */
-  body::after {
-    content: '';
-    position: fixed; inset: 0; z-index: 0; pointer-events: none;
-    background-image: repeating-linear-gradient(
-      0deg,
-      transparent,
-      transparent 2px,
-      rgba(255,255,255,0.008) 2px,
-      rgba(255,255,255,0.008) 4px
-    );
-    background-size: 100% 4px;
-  }
-
-  /* ── HEADER ── */
-  header {
-    position: relative; z-index: 10; flex-shrink: 0;
-    display: grid;
-    grid-template-columns: 1fr auto 1fr;
-    align-items: center;
-    padding: 0 20px;
-    height: 64px;
-    background: rgba(6,6,15,0.92);
-    backdrop-filter: blur(24px);
-    border-bottom: 1px solid var(--border);
-  }
-
-  /* Accent line at the very top of header */
-  header::before {
-    content: '';
-    position: absolute; top: 0; left: 0; right: 0;
-    height: 1px;
-    background: linear-gradient(90deg, transparent 0%, var(--blue) 30%, var(--amber) 70%, transparent 100%);
-    opacity: 0.4;
-  }
-
-  .logo {
-    display: flex; align-items: center; gap: 10px;
-    justify-self: start;
-  }
-
-  .logo-img {
-    width: 52px; height: 52px;
-    object-fit: contain; flex-shrink: 0;
-    filter: drop-shadow(0 0 10px rgba(59,130,246,0.5));
-    transition: filter 0.3s ease, transform 0.3s ease;
-  }
-
-  .logo-img:hover {
-    filter: drop-shadow(0 0 18px rgba(59,130,246,0.8));
-    transform: scale(1.05);
-  }
-
-  .logo-text-wrap { display: flex; flex-direction: column; gap: 1px; }
-
-  .logo-name {
-    font-size: 14px; font-weight: 700; letter-spacing: -0.2px;
-    color: var(--text);
-    line-height: 1;
-  }
-
-  .logo-name span { color: var(--blue); }
-
-  .logo-tag {
-    font-size: 9.5px; color: var(--text3);
-    text-transform: uppercase; letter-spacing: 0.8px;
-    font-family: var(--mono);
-  }
-
-  .header-status {
-    display: flex; align-items: center; gap: 5px;
-    font-size: 10.5px; color: var(--text3); font-family: var(--mono);
-    background: rgba(34,197,94,0.06);
-    border: 1px solid rgba(34,197,94,0.12);
-    padding: 4px 10px; border-radius: 20px;
-    justify-self: center;
-  }
-
-  .status-dot {
-    width: 5px; height: 5px; border-radius: 50%;
-    background: var(--green);
-    box-shadow: 0 0 5px var(--green);
-    animation: pulse 2.5s ease-in-out infinite;
-  }
-
-  @keyframes pulse { 0%,100%{opacity:1; transform:scale(1)} 50%{opacity:.4; transform:scale(.8)} }
-
-  .header-btns { display: flex; gap: 6px; justify-self: end; }
-
-  .btn-icon {
-    width: 28px; height: 28px; border-radius: var(--r-sm);
-    border: 1px solid var(--border);
-    background: var(--surface);
-    color: var(--text2); cursor: pointer;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 12px;
-    transition: all .15s ease;
-  }
-
-  .btn-icon:hover {
-    background: var(--surface2);
-    color: var(--text);
-    border-color: var(--border2);
-  }
-
-  /* ── MAIN ── */
-  main {
-    flex: 1; overflow: hidden;
-    display: flex; flex-direction: column;
-    position: relative; z-index: 1;
-  }
-
-  /* ── CHAT ── */
-  #chat {
-    flex: 1; overflow-y: auto;
-    padding: 28px 20px;
-    scroll-behavior: smooth;
-  }
-
-  #chat::-webkit-scrollbar { width: 3px; }
-  #chat::-webkit-scrollbar-track { background: transparent; }
-  #chat::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
-
-  .chat-inner {
-    max-width: 760px; margin: 0 auto;
-    display: flex; flex-direction: column; gap: 20px;
-  }
-
-  /* ── EMPTY STATE ── */
-  #empty-state {
-    display: flex; flex-direction: column; align-items: center;
-    padding: 48px 20px 20px; text-align: center;
-    animation: fadeUp 0.4s ease-out;
-  }
-
-  .empty-orb {
-    width: 60px; height: 60px; border-radius: 16px;
-    margin-bottom: 22px;
-    background: var(--blue-dim);
-    border: 1px solid rgba(59,130,246,0.2);
-    display: flex; align-items: center; justify-content: center;
-    font-size: 26px;
-    position: relative;
-    box-shadow: 0 0 40px rgba(59,130,246,0.08);
-  }
-
-  .empty-orb::before {
-    content: '';
-    position: absolute; inset: -8px; border-radius: 22px;
-    border: 1px solid rgba(59,130,246,0.08);
-    animation: spin 10s linear infinite;
-  }
-
-  .empty-orb::after {
-    content: '';
-    position: absolute; inset: -16px; border-radius: 28px;
-    border: 1px dashed rgba(59,130,246,0.04);
-    animation: spin 20s linear infinite reverse;
-  }
-
-  @keyframes spin { to { transform: rotate(360deg); } }
-
-  .empty-title {
-    font-size: 24px; font-weight: 700; letter-spacing: -0.5px;
-    margin-bottom: 8px; line-height: 1.2;
-    color: var(--text);
-  }
-
-  .empty-sub {
-    font-size: 13px; color: var(--text2);
-    max-width: 360px; line-height: 1.65;
-    font-weight: 400;
-  }
-
-  .suggestions {
-    display: grid; grid-template-columns: repeat(2, 1fr);
-    gap: 8px; margin-top: 30px;
-    width: 100%; max-width: 640px;
-  }
-
-  .sugg {
-    padding: 12px 14px 12px 16px;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-left: 2px solid transparent;
-    border-radius: var(--r-md);
-    cursor: pointer; text-align: left;
-    transition: all 0.18s ease;
-    font-size: 12.5px; color: var(--text2);
-    line-height: 1.45;
-    position: relative;
-  }
-
-  .sugg:hover {
-    border-color: var(--border2);
-    border-left-color: var(--blue);
-    background: var(--surface2);
-    color: var(--text);
-    transform: translateX(2px);
-  }
-
-  .sugg-icon {
-    font-size: 15px; margin-bottom: 6px; display: block;
-    opacity: 0.85;
-  }
-
-  /* ── MESSAGES ── */
-  .msg {
-    display: flex; flex-direction: column; gap: 4px;
-    animation: fadeUp 0.22s ease-out;
-  }
-
-  @keyframes fadeUp {
-    from { opacity: 0; transform: translateY(6px); }
-    to   { opacity: 1; transform: translateY(0); }
-  }
-
-  .msg.user  { align-items: flex-end; }
-  .msg.agent { align-items: flex-start; }
-
-  .msg-meta {
-    display: flex; align-items: center; gap: 6px;
-    font-size: 10.5px; color: var(--text3);
-    font-family: var(--mono);
-    padding: 0 2px;
-  }
-
-  .avatar {
-    width: 18px; height: 18px; border-radius: 4px; flex-shrink: 0;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 10px; font-weight: 700;
-  }
-
-  .msg.user  .avatar {
-    background: rgba(59,130,246,0.2);
-    border: 1px solid rgba(59,130,246,0.3);
-    color: var(--blue);
-  }
-
-  .msg.agent .avatar {
-    background: rgba(59,130,246,0.08);
-    border: 1px solid rgba(59,130,246,0.15);
-    color: var(--blue);
-    font-size: 9px;
-  }
-
-  .bubble {
-    max-width: 88%;
-    padding: 12px 16px;
-    border-radius: var(--r-lg);
-    font-size: 13.5px;
-    line-height: 1.7;
-    position: relative;
-  }
-
-  .msg.user .bubble {
-    background: var(--bg4);
-    border: 1px solid rgba(59,130,246,0.15);
-    border-bottom-right-radius: 3px;
-    color: var(--text);
-  }
-
-  .msg.agent .bubble {
-    background: var(--bg3);
-    border: 1px solid var(--border);
-    border-left: 2px solid rgba(59,130,246,0.25);
-    border-bottom-left-radius: 3px;
-    width: 100%; max-width: 100%;
-  }
-
-  /* ── MARKDOWN ── */
-  .bubble h1, .bubble h2 { font-size: 16px; font-weight: 700; margin: 16px 0 8px; color: var(--text); }
-  .bubble h3 { font-size: 13.5px; font-weight: 600; margin: 14px 0 6px; color: var(--blue); }
-  .bubble p  { margin-bottom: 9px; }
-  .bubble p:last-child { margin: 0; }
-  .bubble ul, .bubble ol { padding-left: 20px; margin-bottom: 9px; }
-  .bubble li { margin-bottom: 4px; }
-  .bubble strong { color: var(--text); font-weight: 600; }
-  .bubble a { color: var(--blue); text-decoration: none; }
-  .bubble a:hover { text-decoration: underline; }
-  .bubble code {
-    font-family: var(--mono); font-size: 11.5px;
-    background: rgba(59,130,246,0.08);
-    padding: 1px 5px; border-radius: 3px;
-    color: #93c5fd;
-  }
-  .bubble pre {
-    background: var(--bg2); border: 1px solid var(--border);
-    border-radius: var(--r-md); padding: 12px;
-    overflow-x: auto; margin: 8px 0;
-    font-family: var(--mono); font-size: 11.5px;
-  }
-  .bubble pre code { background: none; padding: 0; color: var(--text2); }
-  .bubble table { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 12.5px; }
-  .bubble th {
-    background: rgba(59,130,246,0.06);
-    color: var(--blue); padding: 7px 12px;
-    text-align: left; font-weight: 600;
-    border-bottom: 1px solid rgba(59,130,246,0.15);
-    font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.5px;
-    font-family: var(--mono);
-  }
-  .bubble td {
-    padding: 8px 12px;
-    border-bottom: 1px solid var(--border);
-    color: var(--text2); font-size: 13px;
-  }
-  .bubble tr:last-child td { border-bottom: none; }
-  .bubble tr:hover td { background: rgba(59,130,246,0.02); }
-  .bubble blockquote {
-    border-left: 2px solid var(--blue);
-    padding: 4px 0 4px 14px;
-    color: var(--text2); margin: 8px 0;
-    font-style: italic;
-  }
-  .bubble hr { border: none; border-top: 1px solid var(--border); margin: 12px 0; }
-
-  /* ── THINKING ── */
-  .thinking-wrap { display: flex; flex-direction: column; gap: 6px; max-width: 100%; }
-
-  .thinking-bubble {
-    background: var(--bg3);
-    border: 1px solid var(--border);
-    border-left: 2px solid rgba(59,130,246,0.3);
-    border-radius: var(--r-lg);
-    border-bottom-left-radius: 3px;
-    padding: 12px 16px;
-    display: flex; align-items: center; gap: 14px;
-  }
-
-  .globe {
-    width: 32px; height: 32px; flex-shrink: 0;
-    position: relative; display: flex;
-    align-items: center; justify-content: center;
-  }
-
-  .ring {
-    position: absolute; border-radius: 50%;
-    border: 1px solid transparent;
-  }
-
-  .ring:nth-child(1) {
-    width: 32px; height: 32px;
-    border-top-color: var(--blue);
-    border-right-color: rgba(59,130,246,0.2);
-    animation: spin 1.4s linear infinite;
-  }
-
-  .ring:nth-child(2) {
-    width: 22px; height: 22px;
-    border-top-color: var(--amber);
-    border-left-color: rgba(245,158,11,0.2);
-    animation: spin 0.9s linear infinite reverse;
-  }
-
-  .core {
-    width: 8px; height: 8px; border-radius: 50%;
-    background: var(--blue);
-    box-shadow: 0 0 8px var(--blue-glow);
-    animation: pulse 1.5s ease-in-out infinite;
-  }
-
-  .thinking-info { flex: 1; }
-
-  .thinking-status {
-    font-size: 12px; color: var(--text2);
-    font-weight: 500;
-    display: flex; align-items: center; gap: 7px;
-    font-family: var(--mono);
-  }
-
-  .dots { display: flex; gap: 3px; align-items: center; }
-  .dots span {
-    width: 3px; height: 3px; border-radius: 50%;
-    background: var(--blue); opacity: 0.3;
-    animation: dotpop 1.4s ease-in-out infinite;
-  }
-  .dots span:nth-child(2) { animation-delay: 0.2s; }
-  .dots span:nth-child(3) { animation-delay: 0.4s; }
-
-  @keyframes dotpop {
-    0%, 80%, 100% { opacity: 0.2; transform: scale(0.8); }
-    40% { opacity: 1; transform: scale(1.3); }
-  }
-
-  .thinking-url {
-    font-size: 10.5px; color: var(--text3);
-    font-family: var(--mono); margin-top: 3px;
-  }
-
-  /* ── STEP LOG — terminal feed ── */
-  .step-log {
-    background: var(--bg2);
-    border: 1px solid rgba(59,130,246,0.1);
-    border-radius: var(--r-md);
-    padding: 10px 14px;
-    max-height: 220px; overflow-y: auto;
-    font-family: var(--mono);
-    position: relative;
-  }
-
-  /* scanline effect on step log */
-  .step-log::before {
-    content: '';
-    position: absolute; inset: 0; z-index: 0; pointer-events: none;
-    border-radius: var(--r-md);
-    background-image: repeating-linear-gradient(
-      0deg, transparent, transparent 3px,
-      rgba(59,130,246,0.015) 3px, rgba(59,130,246,0.015) 4px
-    );
-  }
-
-  .step-log::-webkit-scrollbar { width: 2px; }
-  .step-log::-webkit-scrollbar-thumb { background: rgba(59,130,246,0.2); }
-
-  .step-entry {
-    display: flex; gap: 8px; align-items: flex-start;
-    font-size: 11px; padding: 3px 0;
-    border-bottom: 1px solid rgba(255,255,255,0.03);
-    animation: fadeUp 0.18s ease-out;
-    position: relative; z-index: 1;
-  }
-
-  .step-entry:last-child {
-    border-bottom: none;
-  }
-
-  .step-entry:last-child .step-desc::after {
-    content: '▋';
-    display: inline-block;
-    color: var(--blue);
-    margin-left: 2px;
-    animation: blink 1s step-end infinite;
-  }
-
-  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
-
-  .step-num {
-    color: var(--text3); flex-shrink: 0;
-    width: 20px; text-align: right; user-select: none;
-    padding-top: 1px;
-  }
-
-  .step-action {
-    color: var(--amber); flex-shrink: 0;
-    width: 76px; font-size: 10.5px;
-    padding-top: 1px;
-  }
-
-  .step-desc { color: var(--text2); flex: 1; line-height: 1.45; }
-  .step-url  { color: var(--text3); font-size: 10px; margin-top: 2px; }
-
-  /* ── CLARIFY ── */
-  .clarify-bubble {
-    background: rgba(99,102,241,0.05);
-    border: 1px solid rgba(99,102,241,0.2);
-    border-left: 2px solid var(--purple);
-    border-radius: var(--r-lg); border-bottom-left-radius: 3px;
-    padding: 14px 16px; max-width: 560px;
-  }
-
-  .clarify-hdr {
-    font-size: 10px; color: var(--purple); font-weight: 600;
-    text-transform: uppercase; letter-spacing: 0.8px;
-    margin-bottom: 8px; font-family: var(--mono);
-  }
-
-  .clarify-q {
-    font-size: 13.5px; color: var(--text);
-    margin-bottom: 12px; line-height: 1.55;
-  }
-
-  .clarify-row { display: flex; gap: 7px; }
-
-  .clarify-in {
-    flex: 1; padding: 9px 12px; border-radius: var(--r-md);
-    background: var(--bg2); border: 1px solid rgba(99,102,241,0.25);
-    color: var(--text); font-size: 13px;
-    font-family: var(--font); outline: none;
-    transition: border-color 0.15s;
-  }
-
-  .clarify-in:focus { border-color: var(--purple); }
-  .clarify-in::placeholder { color: var(--text3); }
-
-  .clarify-btn {
-    padding: 9px 16px; border-radius: var(--r-md);
-    background: var(--purple); color: #fff;
-    border: none; cursor: pointer;
-    font-size: 13px; font-weight: 600;
-    font-family: var(--font); transition: all 0.15s;
-    white-space: nowrap;
-  }
-
-  .clarify-btn:hover { filter: brightness(1.1); }
-
-  /* ── PROFILE BANNER ── */
-  .profile-bar { padding: 0 0 8px; animation: fadeUp 0.25s ease-out; }
-
-  .profile-banner {
-    display: flex; align-items: center; gap: 10px;
-    padding: 9px 13px;
-    background: var(--blue-dim);
-    border: 1px solid rgba(59,130,246,0.15);
-    border-radius: var(--r-md); font-size: 12px;
-  }
-
-  .p-av {
-    width: 28px; height: 28px; border-radius: 6px;
-    background: rgba(59,130,246,0.2);
-    border: 1px solid rgba(59,130,246,0.3);
-    display: flex; align-items: center; justify-content: center;
-    font-size: 13px; flex-shrink: 0;
-  }
-
-  .p-name  { font-weight: 600; color: var(--text); font-size: 12.5px; }
-  .p-skills { color: var(--text2); margin-top: 1px; font-size: 11.5px; }
-
-  .p-close {
-    margin-left: auto; background: none; border: none;
-    color: var(--text3); cursor: pointer; font-size: 13px;
-    padding: 2px 6px; transition: color 0.15s;
-  }
-
-  .p-close:hover { color: var(--text); }
-
-  /* ── MSG ACTIONS ── */
-  .msg-actions { display: flex; gap: 4px; margin-top: 4px; opacity: 0; transition: opacity 0.15s; }
-  .msg:hover .msg-actions { opacity: 1; }
-
-  .act-btn {
-    padding: 3px 9px; border-radius: var(--r-sm);
-    font-size: 10.5px;
-    border: 1px solid var(--border);
-    background: var(--surface);
-    color: var(--text3); cursor: pointer;
-    font-family: var(--mono);
-    transition: all 0.15s;
-  }
-
-  .act-btn:hover { color: var(--text); background: var(--surface2); border-color: var(--border2); }
-
-  /* ── INPUT AREA ── */
-  #input-area {
-    padding: 12px 20px 14px;
-    flex-shrink: 0;
-    position: relative; z-index: 10;
-    background: rgba(6,6,15,0.95);
-    backdrop-filter: blur(24px);
-    border-top: 1px solid var(--border);
-  }
-
-  .input-wrap {
-    max-width: 760px; margin: 0 auto;
-    background: var(--bg3);
-    border: 1px solid var(--border);
-    border-radius: var(--r-xl);
-    overflow: hidden;
-    transition: border-color 0.2s, box-shadow 0.2s;
-  }
-
-  .input-wrap:focus-within {
-    border-color: rgba(59,130,246,0.35);
-    box-shadow: 0 0 0 3px rgba(59,130,246,0.05), 0 4px 20px rgba(0,0,0,0.3);
-  }
-
-  .input-top {
-    display: flex; align-items: flex-end;
-    padding: 13px 16px 8px;
-  }
-
-  #qinput {
-    flex: 1; background: none; border: none; outline: none;
-    color: var(--text); font-size: 14px;
-    font-family: var(--font); font-weight: 400;
-    resize: none; max-height: 150px; line-height: 1.55;
-  }
-
-  #qinput::placeholder { color: var(--text3); }
-
-  .input-bot {
-    display: flex; align-items: center; justify-content: space-between;
-    padding: 6px 12px 11px;
-    border-top: 1px solid var(--border);
-  }
-
-  .input-hint { font-size: 10.5px; color: var(--text3); font-family: var(--mono); }
-
-  .input-hint kbd {
-    font-family: var(--mono); font-size: 9.5px;
-    background: var(--surface); border: 1px solid var(--border);
-    border-radius: 3px; padding: 1px 5px; color: var(--text2);
-  }
-
-  .input-acts { display: flex; gap: 6px; align-items: center; }
-
-  .attach-btn {
-    width: 28px; height: 28px; border-radius: var(--r-sm);
-    border: 1px solid var(--border); background: var(--surface);
-    color: var(--text2); cursor: pointer;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 13px; transition: all 0.15s;
-  }
-
-  .attach-btn:hover {
-    background: var(--blue-dim);
-    color: var(--blue);
-    border-color: rgba(59,130,246,0.3);
-  }
-
-  #send {
-    height: 28px; padding: 0 14px;
-    border-radius: var(--r-sm); border: none;
-    background: var(--blue);
-    color: #fff; font-size: 12px; font-weight: 600;
-    font-family: var(--font); cursor: pointer;
-    display: flex; align-items: center; gap: 5px;
-    letter-spacing: 0.1px;
-    transition: all 0.15s;
-    box-shadow: 0 2px 8px rgba(59,130,246,0.3);
-  }
-
-  #send:hover { filter: brightness(1.1); transform: translateY(-1px); box-shadow: 0 4px 12px rgba(59,130,246,0.4); }
-  #send:disabled { opacity: 0.35; cursor: not-allowed; transform: none; box-shadow: none; }
-  #file-input { display: none; }
-
-  /* ── TOAST ── */
-  #toast {
-    position: fixed; bottom: 86px; left: 50%; transform: translateX(-50%);
-    background: var(--bg4); border: 1px solid var(--border2);
-    border-radius: var(--r-md); padding: 9px 18px;
-    font-size: 12.5px; color: var(--text); z-index: 100;
-    opacity: 0; transition: opacity 0.2s;
-    pointer-events: none;
-    white-space: nowrap;
-    box-shadow: 0 8px 24px rgba(0,0,0,0.4);
-    font-family: var(--mono);
-  }
-
-  #toast.show { opacity: 1; }
-
-  /* ── RESPONSIVE ── */
-  @media (max-width: 600px) {
-    header { padding: 0 14px; }
-    .suggestions { grid-template-columns: 1fr; }
-    .bubble { font-size: 13px; }
-    #chat { padding: 20px 12px; }
-  }
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  /* Surfaces */
+  --bg:       #0c0c11;
+  --bg2:      #111118;
+  --bg3:      #16161f;
+  --bg4:      #1c1c27;
+
+  /* Borders */
+  --border:   rgba(255,255,255,0.06);
+  --border2:  rgba(255,255,255,0.10);
+  --border3:  rgba(255,255,255,0.16);
+
+  /* Text */
+  --text:     #f0ede8;
+  --text2:    #9b9aaa;
+  --text3:    #5a5870;
+
+  /* Surface overlays */
+  --surface:  rgba(255,255,255,0.03);
+  --surface2: rgba(255,255,255,0.055);
+
+  /* Accent — warm amber, not generic blue */
+  --accent:      #c8956a;
+  --accent-dim:  rgba(200,149,106,0.12);
+  --accent-glow: rgba(200,149,106,0.25);
+
+  /* Semantic */
+  --green:  #4ade80;
+  --red:    #f87171;
+  --yellow: #fbbf24;
+  --blue:   #60a5fa;
+
+  /* Aliases for backward compat */
+  --cyan:     #c8956a;
+  --cyan-dim: rgba(200,149,106,0.12);
+  --purple:   #8b85c1;
+  --orange:   #f97316;
+
+  /* Type */
+  --font: 'Plus Jakarta Sans', system-ui, sans-serif;
+  --mono: 'JetBrains Mono', 'Courier New', monospace;
+
+  /* Radii */
+  --r-sm: 5px;
+  --r-md: 10px;
+  --r-lg: 14px;
+  --r-xl: 20px;
+}
+
+html, body { height: 100%; }
+
+body {
+  font-family: var(--font);
+  font-size: 16px;
+  background: var(--bg);
+  color: var(--text);
+  overflow: hidden;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  -webkit-font-smoothing: antialiased;
+  line-height: 1.6;
+}
+
+/* Dot grid background */
+body::before {
+  content: '';
+  position: fixed; inset: 0; z-index: 0; pointer-events: none;
+  background-image: radial-gradient(circle, rgba(255,255,255,0.04) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+
+body::after {
+  content: '';
+  position: fixed; inset: 0; z-index: 0; pointer-events: none;
+  background:
+    radial-gradient(ellipse 60% 50% at 10% 0%, rgba(200,149,106,0.04) 0%, transparent 55%),
+    radial-gradient(ellipse 50% 60% at 90% 100%, rgba(96,130,250,0.04) 0%, transparent 55%);
+}
+
+/* ── HEADER ─────────────────────────────────────────────────────────── */
+header {
+  position: relative; z-index: 10; flex-shrink: 0;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  height: 62px;
+  padding: 0 24px;
+  background: rgba(12,12,17,0.9);
+  backdrop-filter: blur(20px);
+  border-bottom: 1px solid var(--border);
+}
+
+header::after {
+  content: '';
+  position: absolute; bottom: -1px; left: 0; right: 0; height: 1px;
+  background: linear-gradient(90deg, transparent, var(--accent) 40%, var(--blue) 60%, transparent);
+  opacity: 0.2;
+}
+
+.logo {
+  display: flex; align-items: center; gap: 12px;
+  justify-self: start;
+}
+
+.logo-img {
+  height: 44px; width: 44px;
+  object-fit: contain; flex-shrink: 0;
+  filter: drop-shadow(0 2px 12px rgba(200,149,106,0.3));
+  transition: filter 0.3s;
+}
+
+.logo-img:hover {
+  filter: drop-shadow(0 2px 20px rgba(200,149,106,0.5));
+}
+
+.logo-text-wrap { display: flex; flex-direction: column; gap: 1px; }
+
+.logo-name {
+  font-size: 15px; font-weight: 700;
+  letter-spacing: -0.3px; line-height: 1;
+  color: var(--text);
+}
+
+.logo-name span { color: var(--accent); }
+
+.logo-tag {
+  font-size: 9px; color: var(--text3);
+  text-transform: uppercase; letter-spacing: 1.2px;
+  font-family: var(--mono);
+}
+
+.header-status {
+  display: flex; align-items: center; gap: 6px;
+  font-family: var(--mono); font-size: 10.5px; color: var(--text3);
+  padding: 5px 12px; border-radius: 20px;
+  border: 1px solid rgba(74,222,128,0.1);
+  background: rgba(74,222,128,0.04);
+  justify-self: center;
+}
+
+.status-dot {
+  width: 5px; height: 5px; border-radius: 50%;
+  background: var(--green);
+  box-shadow: 0 0 6px var(--green);
+  animation: blink 2.5s ease-in-out infinite;
+}
+
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+.header-btns { display: flex; gap: 6px; justify-self: end; }
+
+.btn-icon {
+  width: 32px; height: 32px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--border);
+  background: none;
+  color: var(--text3); cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: all 0.15s;
+  font-size: 13px;
+}
+
+.btn-icon:hover {
+  background: var(--surface2);
+  color: var(--text2);
+  border-color: var(--border2);
+}
+
+.btn-icon svg { pointer-events: none; }
+
+/* ── MAIN ────────────────────────────────────────────────────────────── */
+main {
+  flex: 1; overflow: hidden;
+  display: flex; flex-direction: column;
+  position: relative; z-index: 1;
+}
+
+/* ── CHAT ────────────────────────────────────────────────────────────── */
+#chat {
+  flex: 1; overflow-y: auto;
+  padding: 32px 20px;
+  scroll-behavior: smooth;
+}
+
+#chat::-webkit-scrollbar { width: 3px; }
+#chat::-webkit-scrollbar-thumb { background: var(--border3); border-radius: 2px; }
+
+.chat-inner {
+  max-width: 760px; margin: 0 auto;
+  display: flex; flex-direction: column; gap: 24px;
+}
+
+/* ── EMPTY STATE ─────────────────────────────────────────────────────── */
+#empty-state {
+  display: flex; flex-direction: column; align-items: center;
+  padding: 52px 16px 24px;
+  text-align: center;
+  animation: rise 0.5s ease-out;
+}
+
+@keyframes rise { from{opacity:0;transform:translateY(16px)} to{opacity:1;transform:translateY(0)} }
+
+.empty-orb {
+  width: 72px; height: 72px; border-radius: 18px;
+  margin-bottom: 24px;
+  background: var(--bg3);
+  border: 1px solid var(--border2);
+  display: flex; align-items: center; justify-content: center;
+  position: relative;
+}
+
+.empty-orb::before {
+  content: '';
+  position: absolute; inset: -8px; border-radius: 24px;
+  border: 1px solid rgba(200,149,106,0.08);
+  animation: spin 12s linear infinite;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.empty-title {
+  font-size: 26px; font-weight: 700;
+  letter-spacing: -0.6px; margin-bottom: 10px;
+  line-height: 1.2; color: var(--text);
+}
+
+.empty-sub {
+  font-size: 15px; color: var(--text2);
+  max-width: 400px; line-height: 1.65;
+}
+
+.suggestions {
+  display: grid; grid-template-columns: repeat(2, 1fr);
+  gap: 10px; margin-top: 36px;
+  width: 100%; max-width: 680px;
+}
+
+.sugg {
+  padding: 15px 18px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  cursor: pointer; text-align: left;
+  transition: all 0.2s ease;
+  font-size: 14px; color: var(--text2);
+  line-height: 1.5;
+  position: relative;
+  overflow: hidden;
+  display: flex; gap: 12px; align-items: flex-start;
+}
+
+.sugg::before {
+  content: '';
+  position: absolute; inset: 0;
+  background: linear-gradient(135deg, rgba(200,149,106,0.06), transparent);
+  opacity: 0; transition: opacity 0.2s;
+}
+
+.sugg:hover {
+  border-color: rgba(200,149,106,0.3);
+  color: var(--text);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+}
+
+.sugg:hover::before { opacity: 1; }
+
+.sugg-icon {
+  font-size: 13px; color: var(--accent);
+  flex-shrink: 0; margin-top: 2px;
+  font-family: var(--mono);
+  font-weight: 500;
+}
+
+/* ── MESSAGES ────────────────────────────────────────────────────────── */
+.msg {
+  display: flex; flex-direction: column; gap: 5px;
+  animation: msgIn 0.22s ease-out;
+}
+
+@keyframes msgIn { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
+
+.msg.user  { align-items: flex-end; }
+.msg.agent { align-items: flex-start; }
+
+.msg-meta {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 11.5px; color: var(--text3);
+  font-family: var(--mono);
+  padding: 0 2px;
+}
+
+.avatar {
+  width: 22px; height: 22px; border-radius: 5px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 10px; font-weight: 700; flex-shrink: 0;
+  font-family: var(--mono);
+}
+
+.msg.user  .avatar {
+  background: var(--accent-dim);
+  border: 1px solid rgba(200,149,106,0.25);
+  color: var(--accent);
+}
+
+.msg.agent .avatar {
+  background: var(--surface);
+  border: 1px solid var(--border2);
+  color: var(--text2);
+  overflow: hidden;
+}
+
+.msg.agent .avatar img {
+  width: 100%; height: 100%; object-fit: contain;
+}
+
+.bubble {
+  max-width: 88%;
+  padding: 14px 18px;
+  border-radius: var(--r-lg);
+  font-size: 15.5px;
+  line-height: 1.72;
+}
+
+.msg.user .bubble {
+  background: var(--bg4);
+  border: 1px solid var(--border2);
+  border-bottom-right-radius: 3px;
+}
+
+.msg.agent .bubble {
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-left: 2px solid rgba(200,149,106,0.2);
+  border-bottom-left-radius: 3px;
+  width: 100%; max-width: 100%;
+}
+
+/* ── MARKDOWN STYLES ─────────────────────────────────────────────────── */
+.bubble h1, .bubble h2 {
+  font-size: 17px; font-weight: 700;
+  margin: 18px 0 8px; color: var(--text);
+  letter-spacing: -0.3px;
+}
+
+.bubble h3 {
+  font-size: 14.5px; font-weight: 600;
+  margin: 14px 0 6px; color: var(--accent);
+}
+
+.bubble p { margin-bottom: 10px; }
+.bubble p:last-child { margin: 0; }
+.bubble ul, .bubble ol { padding-left: 22px; margin-bottom: 10px; }
+.bubble li { margin-bottom: 4px; }
+.bubble strong { color: var(--text); font-weight: 600; }
+.bubble a { color: var(--accent); text-decoration: none; }
+.bubble a:hover { text-decoration: underline; }
+
+.bubble code {
+  font-family: var(--mono); font-size: 13px;
+  background: rgba(200,149,106,0.08);
+  border: 1px solid rgba(200,149,106,0.12);
+  padding: 1px 6px; border-radius: 4px;
+  color: var(--accent);
+}
+
+.bubble pre {
+  background: var(--bg2);
+  border: 1px solid var(--border2);
+  border-radius: var(--r-md);
+  padding: 14px 16px; overflow-x: auto;
+  margin: 10px 0; font-size: 13px;
+}
+
+.bubble pre code {
+  background: none; border: none; padding: 0;
+  color: var(--text2);
+}
+
+.bubble table {
+  width: 100%; border-collapse: collapse;
+  margin: 12px 0; font-size: 14px;
+}
+
+.bubble th {
+  background: rgba(200,149,106,0.06);
+  color: var(--accent);
+  padding: 9px 14px; text-align: left;
+  font-weight: 600; font-size: 12px;
+  text-transform: uppercase; letter-spacing: 0.5px;
+  border-bottom: 1px solid rgba(200,149,106,0.15);
+  font-family: var(--mono);
+}
+
+.bubble td {
+  padding: 9px 14px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text2); vertical-align: top;
+}
+
+.bubble tr:last-child td { border-bottom: none; }
+.bubble tr:hover td { background: rgba(255,255,255,0.015); }
+
+.bubble blockquote {
+  border-left: 2px solid var(--accent);
+  padding: 4px 0 4px 16px;
+  color: var(--text2); margin: 10px 0;
+  font-style: italic;
+}
+
+.bubble hr {
+  border: none; border-top: 1px solid var(--border);
+  margin: 14px 0;
+}
+
+/* ── THINKING STATE ──────────────────────────────────────────────────── */
+.thinking-wrap { display: flex; flex-direction: column; gap: 8px; max-width: 100%; }
+
+.thinking-bubble {
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-left: 2px solid rgba(200,149,106,0.3);
+  border-radius: var(--r-lg); border-bottom-left-radius: 3px;
+  padding: 14px 18px;
+  display: flex; align-items: center; gap: 14px;
+}
+
+/* Clean minimal spinner */
+.globe {
+  width: 20px; height: 20px; flex-shrink: 0;
+  position: relative;
+}
+
+.ring {
+  position: absolute; border-radius: 50%;
+  border: 1.5px solid transparent;
+}
+
+.ring:nth-child(1) {
+  inset: 0;
+  border-top-color: var(--accent);
+  animation: spin 1s linear infinite;
+}
+
+.ring:nth-child(2) {
+  inset: 4px;
+  border-top-color: rgba(200,149,106,0.4);
+  animation: spin 0.7s linear infinite reverse;
+}
+
+.core {
+  position: absolute; inset: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+  opacity: 0.5;
+  animation: blink 1.4s ease-in-out infinite;
+}
+
+.thinking-info { flex: 1; }
+
+.thinking-status {
+  font-size: 13.5px; color: var(--text2);
+  font-weight: 500;
+  display: flex; align-items: center; gap: 8px;
+}
+
+.dots { display: flex; gap: 4px; align-items: center; }
+.dots span {
+  width: 3px; height: 3px; border-radius: 50%;
+  background: var(--accent); opacity: 0.3;
+  animation: dotpop 1.4s ease-in-out infinite;
+}
+.dots span:nth-child(2) { animation-delay: 0.2s; }
+.dots span:nth-child(3) { animation-delay: 0.4s; }
+
+@keyframes dotpop {
+  0%,80%,100% { opacity: 0.2; transform: scale(0.7); }
+  40% { opacity: 1; transform: scale(1.3); }
+}
+
+.thinking-url {
+  font-size: 11.5px; color: var(--text3);
+  font-family: var(--mono); margin-top: 4px;
+}
+
+/* ── STEP LOG — terminal ─────────────────────────────────────────────── */
+.step-log {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: 10px 14px;
+  max-height: 220px; overflow-y: auto;
+  font-family: var(--mono);
+}
+
+.step-log::-webkit-scrollbar { width: 2px; }
+.step-log::-webkit-scrollbar-thumb { background: var(--border3); }
+
+.step-entry {
+  display: flex; gap: 10px; align-items: flex-start;
+  font-size: 12px; padding: 3px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.03);
+  animation: msgIn 0.15s ease-out;
+}
+
+.step-entry:last-child { border-bottom: none; }
+
+.step-num { color: var(--text3); flex-shrink: 0; width: 20px; text-align: right; }
+
+.step-action {
+  color: var(--accent); flex-shrink: 0;
+  width: 72px; font-size: 11.5px;
+}
+
+.step-desc { color: var(--text2); flex: 1; line-height: 1.4; }
+.step-url  { color: var(--text3); font-size: 11px; margin-top: 2px; }
+
+/* ── CLARIFY ─────────────────────────────────────────────────────────── */
+.clarify-bubble {
+  background: var(--bg3);
+  border: 1px solid rgba(139,133,193,0.2);
+  border-left: 2px solid var(--purple);
+  border-radius: var(--r-lg); border-bottom-left-radius: 3px;
+  padding: 16px 18px; max-width: 560px;
+}
+
+.clarify-hdr {
+  font-size: 11px; color: var(--purple);
+  font-weight: 600; text-transform: uppercase;
+  letter-spacing: 0.8px; margin-bottom: 9px;
+  font-family: var(--mono);
+}
+
+.clarify-q {
+  font-size: 15px; color: var(--text);
+  margin-bottom: 14px; line-height: 1.55;
+}
+
+.clarify-row { display: flex; gap: 8px; }
+
+.clarify-in {
+  flex: 1; padding: 10px 14px; border-radius: var(--r-md);
+  background: var(--bg2); border: 1px solid var(--border2);
+  color: var(--text); font-size: 14px;
+  font-family: var(--font); outline: none;
+  transition: border-color 0.15s;
+}
+
+.clarify-in:focus { border-color: var(--purple); }
+.clarify-in::placeholder { color: var(--text3); }
+
+.clarify-btn {
+  padding: 10px 18px; border-radius: var(--r-md);
+  background: var(--purple); color: #fff;
+  border: none; cursor: pointer;
+  font-size: 14px; font-weight: 600;
+  font-family: var(--font); transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.clarify-btn:hover { filter: brightness(1.12); }
+
+/* ── PROFILE BANNER ──────────────────────────────────────────────────── */
+.profile-bar { padding: 0 0 10px; animation: rise 0.25s ease-out; }
+
+.profile-banner {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 14px;
+  background: var(--accent-dim);
+  border: 1px solid rgba(200,149,106,0.18);
+  border-radius: var(--r-md);
+}
+
+.p-av {
+  width: 30px; height: 30px; border-radius: 7px;
+  background: rgba(200,149,106,0.15);
+  border: 1px solid rgba(200,149,106,0.25);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; flex-shrink: 0; color: var(--accent);
+  font-family: var(--mono); font-weight: 600;
+}
+
+.p-name  { font-weight: 600; color: var(--text); font-size: 13px; }
+.p-skills { color: var(--text2); margin-top: 1px; font-size: 12px; }
+
+.p-close {
+  margin-left: auto; background: none; border: none;
+  color: var(--text3); cursor: pointer; font-size: 14px;
+  padding: 2px 6px; transition: color 0.15s;
+}
+
+.p-close:hover { color: var(--text); }
+
+/* ── MESSAGE ACTIONS ─────────────────────────────────────────────────── */
+.msg-actions {
+  display: flex; gap: 4px; margin-top: 4px;
+  opacity: 0; transition: opacity 0.15s;
+}
+
+.msg:hover .msg-actions { opacity: 1; }
+
+.act-btn {
+  padding: 3px 10px; border-radius: var(--r-sm);
+  font-size: 11.5px; font-family: var(--mono);
+  border: 1px solid var(--border); background: none;
+  color: var(--text3); cursor: pointer;
+  transition: all 0.15s;
+}
+
+.act-btn:hover { color: var(--text); background: var(--surface2); border-color: var(--border2); }
+
+/* ── INPUT AREA ──────────────────────────────────────────────────────── */
+#input-area {
+  padding: 14px 20px 18px;
+  flex-shrink: 0;
+  position: relative; z-index: 10;
+  background: rgba(12,12,17,0.96);
+  backdrop-filter: blur(24px);
+  border-top: 1px solid var(--border);
+}
+
+.input-wrap {
+  max-width: 760px; margin: 0 auto;
+  background: var(--bg3);
+  border: 1px solid var(--border2);
+  border-radius: var(--r-xl);
+  transition: border-color 0.2s, box-shadow 0.25s;
+}
+
+.input-wrap:focus-within {
+  border-color: rgba(200,149,106,0.4);
+  box-shadow: 0 0 0 3px rgba(200,149,106,0.07), 0 4px 24px rgba(0,0,0,0.35);
+}
+
+.input-top {
+  display: flex; align-items: flex-end;
+  padding: 16px 18px 10px;
+}
+
+#qinput {
+  flex: 1; background: none; border: none; outline: none;
+  color: var(--text); font-size: 16px;
+  font-family: var(--font); font-weight: 400;
+  resize: none; max-height: 160px; line-height: 1.6;
+  letter-spacing: -0.1px;
+}
+
+#qinput::placeholder { color: var(--text3); }
+
+.input-bot {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 7px 14px 13px;
+  border-top: 1px solid var(--border);
+}
+
+.input-hint {
+  font-size: 11.5px; color: var(--text3);
+  font-family: var(--mono);
+}
+
+.input-hint kbd {
+  font-family: var(--mono); font-size: 11px;
+  background: var(--surface2); border: 1px solid var(--border2);
+  border-radius: 4px; padding: 1px 5px; color: var(--text2);
+}
+
+.input-acts { display: flex; gap: 7px; align-items: center; }
+
+.attach-btn {
+  width: 32px; height: 32px; border-radius: var(--r-sm);
+  border: 1px solid var(--border);
+  background: none; color: var(--text3); cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 14px; transition: all 0.15s;
+}
+
+.attach-btn:hover {
+  background: var(--accent-dim);
+  color: var(--accent);
+  border-color: rgba(200,149,106,0.3);
+}
+
+#send {
+  height: 32px; padding: 0 18px;
+  border-radius: var(--r-sm); border: none;
+  background: var(--accent);
+  color: #1a0e06;
+  font-size: 13.5px; font-weight: 700;
+  font-family: var(--font); cursor: pointer;
+  display: flex; align-items: center; gap: 6px;
+  letter-spacing: 0.1px;
+  transition: all 0.18s;
+  box-shadow: 0 2px 10px rgba(200,149,106,0.3);
+}
+
+#send:hover {
+  filter: brightness(1.08);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px rgba(200,149,106,0.4);
+}
+
+#send:disabled { opacity: 0.3; cursor: not-allowed; transform: none; box-shadow: none; }
+#file-input { display: none; }
+
+/* ── TOAST ───────────────────────────────────────────────────────────── */
+#toast {
+  position: fixed; bottom: 88px; left: 50%; transform: translateX(-50%);
+  background: var(--bg4); border: 1px solid var(--border3);
+  border-radius: var(--r-md); padding: 10px 20px;
+  font-size: 13px; color: var(--text); z-index: 200;
+  opacity: 0; transition: opacity 0.2s;
+  pointer-events: none; white-space: nowrap;
+  box-shadow: 0 8px 28px rgba(0,0,0,0.5);
+  font-family: var(--mono);
+}
+
+#toast.show { opacity: 1; }
+
+/* ── RESPONSIVE ──────────────────────────────────────────────────────── */
+@media (max-width: 640px) {
+  header { padding: 0 14px; }
+  .suggestions { grid-template-columns: 1fr; }
+  #chat { padding: 20px 12px; }
+  .bubble { font-size: 15px; }
+}
 </style>
 </head>
 <body>
 
+<!-- HEADER -->
 <header>
   <div class="logo">
     <img src="/static/logo.png" alt="Agentic Web" class="logo-img">
     <div class="logo-text-wrap">
       <div class="logo-name">Agentic<span>Web</span></div>
-      <div class="logo-tag">🐘 · 🐦‍⬛ · 🐙 &nbsp; autonomous research agent</div>
+      <div class="logo-tag">autonomous · web · agent</div>
     </div>
   </div>
+
   <div class="header-status">
     <div class="status-dot"></div>
-    <span>agent online</span>
+    <span>online</span>
   </div>
+
   <div class="header-btns">
-    <button class="btn-icon" onclick="toggleTrainPanel()" title="Train agent">⚡</button>
-    <button class="btn-icon" onclick="newChat()" title="New chat">⊘</button>
+    <button class="btn-icon" onclick="toggleTrainPanel()" title="Models & Knowledge">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/>
+      </svg>
+    </button>
+    <button class="btn-icon" onclick="newChat()" title="New conversation">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M12 5v14M5 12h14"/>
+      </svg>
+    </button>
   </div>
 </header>
 
+<!-- MAIN -->
 <main>
   <div id="chat">
     <div class="chat-inner" id="ci">
+
       <div id="empty-state">
-        <div class="empty-orb"><img src="/static/logo.png" style="width:40px;height:40px;object-fit:contain;filter:drop-shadow(0 0 10px rgba(59,130,246,0.5))"></div>
+        <div class="empty-orb">
+          <img src="/static/logo.png" style="width:42px;height:42px;object-fit:contain;filter:drop-shadow(0 0 12px rgba(200,149,106,0.45))">
+        </div>
         <div class="empty-title">What do you want to research?</div>
         <div class="empty-sub">
-          The 🐘 remembers everything. The 🐦‍⬛ sees the whole web. The 🐙 reaches anywhere.<br>
-          Just ask — I'll find it.
+          An autonomous agent that browses, extracts, and synthesises information from across the web.<br>
+          Ask anything — it will find it.
         </div>
+
         <div class="suggestions">
           <div class="sugg" onclick="useSugg(this)">
-            <span class="sugg-icon">✈️</span>
-            Find flights Mumbai→Delhi June 15 under ₹8000 with hotel options
+            <span class="sugg-icon">→</span>
+            <span>Find flights Mumbai → Delhi, June 15, under ₹8000 with hotel options</span>
           </div>
           <div class="sugg" onclick="useSugg(this)">
-            <span class="sugg-icon">💼</span>
-            Python developer jobs in Mumbai on Naukri — salary, skills, apply links
+            <span class="sugg-icon">→</span>
+            <span>Python developer jobs in Mumbai on Naukri — salary, skills, apply links</span>
           </div>
           <div class="sugg" onclick="useSugg(this)">
-            <span class="sugg-icon">🔔</span>
-            Samsung Galaxy S24 under ₹55,000 — compare Flipkart vs Amazon prices
+            <span class="sugg-icon">→</span>
+            <span>Samsung Galaxy S24 under ₹55,000 — compare Flipkart vs Amazon prices</span>
           </div>
           <div class="sugg" onclick="useSugg(this)">
-            <span class="sugg-icon">🏆</span>
-            Top hackathons for BTech CSE engineer skilled in Python &amp; ML
+            <span class="sugg-icon">→</span>
+            <span>Top hackathons for a BTech CSE engineer skilled in Python &amp; ML</span>
           </div>
         </div>
       </div>
+
     </div>
   </div>
 
+  <!-- INPUT -->
   <div id="input-area">
     <div id="profile-bar"></div>
     <div class="input-wrap">
       <div class="input-top">
-        <textarea id="qinput" rows="1" placeholder="Ask anything — I'll research it on the web…"
+        <textarea id="qinput" rows="1"
+          placeholder="Ask anything — the agent will research it for you…"
           onkeydown="handleKey(event)" oninput="resize(this)"></textarea>
       </div>
       <div class="input-bot">
-        <div class="input-hint"><kbd>Enter</kbd> send &nbsp;·&nbsp; <kbd>⇧Enter</kbd> newline</div>
+        <div class="input-hint">
+          <kbd>Enter</kbd> send &nbsp;·&nbsp; <kbd>⇧ Enter</kbd> newline
+        </div>
         <div class="input-acts">
-          <button class="attach-btn" onclick="document.getElementById('file-input').click()" title="Upload resume (PDF)">📎</button>
+          <button class="attach-btn" onclick="document.getElementById('file-input').click()" title="Upload resume">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
+            </svg>
+          </button>
           <input type="file" id="file-input" accept=".pdf" onchange="uploadResume(event)">
           <button id="send" onclick="send()">
             Send
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
               <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/>
             </svg>
           </button>
@@ -797,62 +838,76 @@
     </div>
   </div>
 </main>
+
 <div id="toast"></div>
 
-<!-- TRAINING PANEL -->
-<div id="train-panel" style="display:none;position:fixed;top:0;right:0;width:380px;height:100vh;
+<!-- SIDE PANEL -->
+<div id="train-panel" style="display:none;position:fixed;top:0;right:0;width:360px;height:100vh;
   background:var(--bg2);border-left:1px solid var(--border);z-index:50;overflow-y:auto;
-  padding:20px;box-shadow:-4px 0 20px rgba(0,0,0,0.4);">
+  padding:22px 20px;box-shadow:-8px 0 32px rgba(0,0,0,0.5);">
 
-  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;">
-    <div style="font-size:15px;font-weight:700;color:var(--cyan)">🎓 Train Agent</div>
-    <button onclick="toggleTrainPanel()" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:18px;">✕</button>
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
+    <div style="font-size:14px;font-weight:600;color:var(--text);letter-spacing:-0.2px;">Intelligence Panel</div>
+    <button onclick="toggleTrainPanel()" style="background:none;border:none;color:var(--text3);cursor:pointer;
+      width:28px;height:28px;display:flex;align-items:center;justify-content:center;
+      border-radius:5px;transition:all .15s;" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background='none'">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+    </button>
   </div>
 
-  <!-- TAB SWITCHER — agent self-trains, no manual tabs needed -->
-  <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:5px;margin-bottom:18px;">
+  <!-- TAB SWITCHER -->
+  <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:5px;margin-bottom:16px;">
     <button onclick="switchTab('models')" id="tab-models"
-      style="padding:7px;border-radius:8px;border:1px solid var(--cyan);
-      background:var(--cyan-dim);color:var(--cyan);font-size:11px;font-weight:600;cursor:pointer;font-family:var(--font)">
-      🤖 Models
+      style="padding:8px;border-radius:7px;border:1px solid var(--accent);
+      background:var(--accent-dim);color:var(--accent);font-size:12px;font-weight:600;
+      cursor:pointer;font-family:var(--font);transition:all .15s;">
+      Models
     </button>
     <button onclick="switchTab('view')" id="tab-view"
-      style="padding:7px;border-radius:8px;border:1px solid var(--border);
-      background:var(--surface);color:var(--text2);font-size:11px;font-weight:600;cursor:pointer;font-family:var(--font)">
-      🧠 What I Know
+      style="padding:8px;border-radius:7px;border:1px solid var(--border);
+      background:none;color:var(--text2);font-size:12px;font-weight:600;
+      cursor:pointer;font-family:var(--font);transition:all .15s;">
+      What I Know
     </button>
   </div>
-  <p style="font-size:11px;color:var(--text3);margin-bottom:14px;line-height:1.5;font-family:var(--font);
-    padding:8px 10px;background:rgba(59,130,246,0.05);border-radius:6px;border-left:2px solid var(--blue)">
-    🐘 The agent self-trains after every search — it automatically learns which sites work fast, which to avoid, and the best navigation patterns.
-  </p>
+
+  <div style="font-size:11.5px;color:var(--text3);margin-bottom:16px;line-height:1.6;
+    padding:10px 12px;background:var(--accent-dim);border-radius:7px;
+    border-left:2px solid rgba(200,149,106,0.3);">
+    The agent self-trains after every search. It automatically learns which sites work, which to avoid, and the best navigation patterns.
+  </div>
 
   <!-- MODELS TAB -->
   <div id="pane-models">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
-      <p style="font-size:12px;color:var(--text3);line-height:1.4;">Live quota status for all Gemini models.</p>
-      <button onclick="loadModels()" style="padding:4px 10px;border-radius:6px;border:1px solid var(--border);
-        background:var(--surface);color:var(--text2);font-size:11px;cursor:pointer;font-family:var(--font)">↻ Refresh</button>
+      <span style="font-size:12px;color:var(--text3);">Live quota status</span>
+      <button onclick="loadModels()" style="padding:5px 11px;border-radius:6px;border:1px solid var(--border);
+        background:none;color:var(--text2);font-size:11px;cursor:pointer;font-family:var(--mono);
+        transition:all .15s;" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background='none'">
+        ⟳ Refresh
+      </button>
     </div>
     <div id="model-list">
-      <div style="text-align:center;padding:20px;color:var(--text3);font-size:12px;font-family:var(--font)">
-        Click Refresh to check quotas...
+      <div style="text-align:center;padding:24px;color:var(--text3);font-size:12.5px;font-family:var(--font)">
+        Click Refresh to check quotas
       </div>
     </div>
-    <div id="model-footer" style="margin-top:12px;padding:10px 12px;background:var(--bg3);border-radius:8px;
-      border:1px solid var(--border);font-size:11px;color:var(--text3);font-family:var(--font)"></div>
+    <div id="model-footer" style="margin-top:12px;padding:10px 12px;background:var(--bg3);border-radius:7px;
+      border:1px solid var(--border);font-size:11px;color:var(--text3);font-family:var(--mono);line-height:1.6;"></div>
   </div>
-
 
   <!-- VIEW TAB -->
   <div id="pane-view" style="display:none">
-    <button onclick="loadKnowledge()" style="width:100%;padding:8px;border-radius:8px;border:1px solid var(--border);
-      background:var(--surface);color:var(--text2);font-family:var(--font);font-size:12px;cursor:pointer;margin-bottom:12px;">
-      🔄 Refresh
+    <button onclick="loadKnowledge()" style="width:100%;padding:9px;border-radius:7px;
+      border:1px solid var(--border);background:none;color:var(--text2);font-family:var(--font);
+      font-size:12.5px;cursor:pointer;margin-bottom:12px;transition:all .15s;"
+      onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background='none'">
+      ⟳ Refresh knowledge
     </button>
     <div id="knowledge-view" style="font-size:11.5px;color:var(--text2);font-family:var(--mono);
-      background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:12px;
-      max-height:calc(100vh - 160px);overflow-y:auto;white-space:pre-wrap;word-break:break-all;">
+      background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:14px;
+      max-height:calc(100vh - 200px);overflow-y:auto;white-space:pre-wrap;
+      word-break:break-all;line-height:1.6;">
       Click Refresh to load...
     </div>
   </div>
@@ -863,40 +918,32 @@ const API = 'http://localhost:8000';
 marked.setOptions({ gfm: true, breaks: true });
 
 let busy = false, resumeProfile = null, clarifyTaskId = null;
-// Conversation history — last 10 turns sent with every query for context
-let chatHistory = [];  // [{role: "user"|"agent", content: "..."}]
+let chatHistory = [];
 const MAX_HISTORY = 10;
 let thinkingEl = null, stepLogEl = null, stepPollInterval = null;
 
-// ── RESIZE ────────────────────────────────────────────────────────────────
 function resize(el) {
   el.style.height = 'auto';
-  el.style.height = Math.min(el.scrollHeight, 150) + 'px';
+  el.style.height = Math.min(el.scrollHeight, 160) + 'px';
 }
 function handleKey(e) { if (e.key==='Enter' && !e.shiftKey){e.preventDefault();send();} }
 
-// ── SEND ──────────────────────────────────────────────────────────────────
 async function send() {
   const el = document.getElementById('qinput');
   const q = el.value.trim();
   if (!q || busy) return;
-
   hideEmpty();
   addUserMsg(q);
   el.value = ''; resize(el);
   setBusy(true);
-
   const query = resumeProfile ? `${q}\n\nMy profile: ${resumeProfile}` : q;
-
-  // Add user message to history
   chatHistory.push({role: "user", content: q});
   if (chatHistory.length > MAX_HISTORY) chatHistory = chatHistory.slice(-MAX_HISTORY);
-
   try {
     const r = await fetch(`${API}/tasks/research`, {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({query, context: chatHistory.slice(0, -1)}) // exclude current msg
+      body: JSON.stringify({query, context: chatHistory.slice(0, -1)})
     });
     const task = await r.json();
     startThinking(task.task_id);
@@ -908,14 +955,15 @@ async function send() {
   }
 }
 
-// ── THINKING + STEP STREAMING ─────────────────────────────────────────────
 function startThinking(taskId) {
-  // Create the thinking bubble
   const wrap = document.createElement('div');
   wrap.className = 'msg agent';
   wrap.id = 'thinking-wrap';
   wrap.innerHTML = `
-    <div class="msg-meta"><div class="avatar">🐙</div><span>Agentic Web</span></div>
+    <div class="msg-meta">
+      <div class="avatar"><img src="/static/logo.png" style="width:22px;height:22px;object-fit:contain;filter:drop-shadow(0 0 4px rgba(200,149,106,0.4))"></div>
+      <span>Agentic Web</span>
+    </div>
     <div class="thinking-wrap">
       <div class="thinking-bubble">
         <div class="globe">
@@ -923,10 +971,10 @@ function startThinking(taskId) {
         </div>
         <div class="thinking-info">
           <div class="thinking-status">
-            🐦‍⬛ Scanning the web
+            Browsing the web
             <div class="dots"><span></span><span></span><span></span></div>
           </div>
-          <div class="thinking-url" id="thinking-url">🐘 Remembering past runs…</div>
+          <div class="thinking-url" id="thinking-url">Initialising…</div>
         </div>
       </div>
       <div class="step-log" id="step-log" style="display:none"></div>
@@ -934,8 +982,6 @@ function startThinking(taskId) {
   appendToChat(wrap);
   thinkingEl = wrap;
   stepLogEl = document.getElementById('step-log');
-
-  // Start polling steps every 2s
   let lastCount = 0;
   stepPollInterval = setInterval(async () => {
     try {
@@ -946,11 +992,10 @@ function startThinking(taskId) {
         const newSteps = steps.slice(lastCount);
         newSteps.forEach(s => addStepEntry(s));
         lastCount = steps.length;
-        // Update URL in thinking bubble
         const urlEl = document.getElementById('thinking-url');
         const last = steps[steps.length - 1];
         if (urlEl && last) {
-          urlEl.textContent = last.url ? '🐦‍⬛ ' + stripUrl(last.url) : (last.detail || '🐙 reaching out…');
+          urlEl.textContent = last.url ? stripUrl(last.url) : (last.detail || 'processing…');
         }
       }
     } catch {}
@@ -960,14 +1005,11 @@ function startThinking(taskId) {
 function addStepEntry(step) {
   if (!stepLogEl) return;
   if (stepLogEl.style.display === 'none') stepLogEl.style.display = 'block';
-
   const el = document.createElement('div');
   el.className = 'step-entry';
-
   const action = step.action || 'step';
   const desc = step.description || step.detail || '';
   const url = step.url ? stripUrl(step.url) : '';
-
   el.innerHTML = `
     <div class="step-num">${step.step}</div>
     <div>
@@ -977,7 +1019,6 @@ function addStepEntry(step) {
       </div>
       ${url ? `<div class="step-url">${esc(url)}</div>` : ''}
     </div>`;
-
   stepLogEl.appendChild(el);
   stepLogEl.scrollTop = stepLogEl.scrollHeight;
 }
@@ -994,7 +1035,6 @@ function stopThinking() {
   thinkingEl = null; stepLogEl = null;
 }
 
-// ── POLL TASK ─────────────────────────────────────────────────────────────
 async function poll(taskId) {
   while (true) {
     await sleep(2000);
@@ -1003,26 +1043,22 @@ async function poll(taskId) {
       const r = await fetch(`${API}/tasks/${taskId}`);
       task = await r.json();
     } catch { continue; }
-
     if (task.status === 'waiting_user') {
       stopThinking();
       addClarify(taskId, task.clarifying_question || 'Could you clarify your request?');
       return;
     }
-
     if (task.status === 'completed') {
       stopThinking();
       const result = task.result || {};
       const text = result.result || result.summary || '';
-      const displayText = text || 'Task completed — but no result was returned. Try rephrasing your query.';
+      const displayText = text || 'Task completed — no result returned. Try rephrasing.';
       addAgentMsg(displayText);
-      // Save agent reply to history (trimmed to avoid huge context)
       chatHistory.push({role: "agent", content: displayText.slice(0, 600)});
       if (chatHistory.length > MAX_HISTORY) chatHistory = chatHistory.slice(-MAX_HISTORY);
       setBusy(false);
       return;
     }
-
     if (task.status === 'failed') {
       stopThinking();
       addErrorMsg(task.error || 'The agent encountered an error. Please try again.');
@@ -1032,15 +1068,17 @@ async function poll(taskId) {
   }
 }
 
-// ── CLARIFY ───────────────────────────────────────────────────────────────
 function addClarify(taskId, question) {
   clarifyTaskId = taskId;
   const el = document.createElement('div');
   el.className = 'msg agent'; el.id = 'clarify-el';
   el.innerHTML = `
-    <div class="msg-meta"><div class="avatar">🐙</div><span>Agentic Web</span></div>
+    <div class="msg-meta">
+      <div class="avatar"><img src="/static/logo.png" style="width:22px;height:22px;object-fit:contain"></div>
+      <span>Agentic Web</span>
+    </div>
     <div class="clarify-bubble">
-      <div class="clarify-hdr">❓ One quick clarification</div>
+      <div class="clarify-hdr">Clarification needed</div>
       <div class="clarify-q">${esc(question)}</div>
       <div class="clarify-row">
         <input class="clarify-in" id="clarify-in" placeholder="Your answer…"
@@ -1073,7 +1111,6 @@ async function submitClarify() {
   clarifyTaskId = null;
 }
 
-// ── RESUME UPLOAD ─────────────────────────────────────────────────────────
 async function uploadResume(ev) {
   const f = ev.target.files[0]; if (!f) return;
   toast('Parsing resume…');
@@ -1087,7 +1124,7 @@ async function uploadResume(ev) {
     document.getElementById('profile-bar').innerHTML = `
       <div class="profile-bar">
         <div class="profile-banner">
-          <div class="p-av">👤</div>
+          <div class="p-av">R</div>
           <div>
             <div class="p-name">${esc(p.name||'Resume loaded')}</div>
             <div class="p-skills">${esc(p.current_role||'')}${skills?' · '+esc(skills):''}</div>
@@ -1095,7 +1132,7 @@ async function uploadResume(ev) {
           <button class="p-close" onclick="clearResume()">✕</button>
         </div>
       </div>`;
-    toast('Resume saved — profile will be used for job/hackathon searches.');
+    toast('Resume saved — used automatically for job and hackathon searches.');
   } catch { toast('Failed to parse resume.'); }
   ev.target.value = '';
 }
@@ -1105,7 +1142,6 @@ function clearResume() {
   document.getElementById('profile-bar').innerHTML = '';
 }
 
-// ── DOM HELPERS ───────────────────────────────────────────────────────────
 function addUserMsg(text) {
   const el = document.createElement('div');
   el.className = 'msg user';
@@ -1119,10 +1155,14 @@ function addAgentMsg(md) {
   const el = document.createElement('div');
   el.className = 'msg agent';
   el.innerHTML = `
-    <div class="msg-meta"><div class="avatar">🐙</div><span>Agentic Web</span><span style="margin-left:auto;color:var(--text3)">${ts()}</span></div>
+    <div class="msg-meta">
+      <div class="avatar"><img src="/static/logo.png" style="width:22px;height:22px;object-fit:contain"></div>
+      <span>Agentic Web</span>
+      <span style="margin-left:auto;color:var(--text3)">${ts()}</span>
+    </div>
     <div class="bubble"><div class="md-content">${marked.parse(md||'')}</div></div>
     <div class="msg-actions">
-      <button class="act-btn" onclick="copyMsg(this)">📋 Copy</button>
+      <button class="act-btn" onclick="copyMsg(this)">Copy</button>
     </div>`;
   appendToChat(el);
 }
@@ -1131,9 +1171,12 @@ function addErrorMsg(msg) {
   const el = document.createElement('div');
   el.className = 'msg agent';
   el.innerHTML = `
-    <div class="msg-meta"><div class="avatar">🐙</div><span>Agentic Web</span></div>
-    <div class="bubble" style="border-color:rgba(239,68,68,.3);background:rgba(239,68,68,.05)">
-      <strong style="color:var(--red)">Something went wrong</strong><br>
+    <div class="msg-meta">
+      <div class="avatar"><img src="/static/logo.png" style="width:22px;height:22px;object-fit:contain"></div>
+      <span>Agentic Web</span>
+    </div>
+    <div class="bubble" style="border-color:rgba(248,113,113,.25);background:rgba(248,113,113,.04)">
+      <strong style="color:var(--red);font-size:14px;">Error</strong><br>
       <span style="color:var(--text2)">${esc(msg)}</span>
     </div>`;
   appendToChat(el);
@@ -1148,7 +1191,7 @@ function copyMsg(btn) {
   const content = btn.closest('.msg').querySelector('.md-content');
   navigator.clipboard.writeText(content?.innerText || '');
   btn.textContent = '✓ Copied';
-  setTimeout(() => btn.textContent = '📋 Copy', 1500);
+  setTimeout(() => btn.textContent = 'Copy', 1600);
 }
 
 function newChat() {
@@ -1156,12 +1199,11 @@ function newChat() {
   window.location.reload();
 }
 
-// ── TRAINING PANEL ────────────────────────────────────────────────────────
 function toggleTrainPanel() {
   const p = document.getElementById('train-panel');
   const isOpening = p.style.display === 'none';
   p.style.display = isOpening ? 'block' : 'none';
-  if (isOpening) switchTab('models'); // auto-load model status on open
+  if (isOpening) switchTab('models');
 }
 
 function switchTab(tab) {
@@ -1171,12 +1213,12 @@ function switchTab(tab) {
     const btn = document.getElementById(`tab-${t}`);
     if (!btn) return;
     if (t === tab) {
-      btn.style.borderColor = 'var(--cyan)';
-      btn.style.background = 'var(--cyan-dim)';
-      btn.style.color = 'var(--cyan)';
+      btn.style.borderColor = 'var(--accent)';
+      btn.style.background = 'var(--accent-dim)';
+      btn.style.color = 'var(--accent)';
     } else {
       btn.style.borderColor = 'var(--border)';
-      btn.style.background = 'var(--surface)';
+      btn.style.background = 'none';
       btn.style.color = 'var(--text2)';
     }
   });
@@ -1187,159 +1229,131 @@ function switchTab(tab) {
 async function loadModels() {
   const list = document.getElementById('model-list');
   const footer = document.getElementById('model-footer');
-  list.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text3);font-size:12px;">Checking quotas...</div>';
-
+  list.innerHTML = '<div style="text-align:center;padding:24px;color:var(--text3);font-size:12.5px;">Checking quotas…</div>';
   try {
     const r = await fetch(`${API}/tasks/models`);
     const d = await r.json();
     const models = d.models || [];
-
     const small = models.filter(m => m.tier === 'small');
     const large = models.filter(m => m.tier === 'large');
 
     function modelCard(m) {
-      const statusColors = {
-        available:   { bg: 'rgba(34,197,94,0.08)',  border: 'rgba(34,197,94,0.2)',  dot: '#22c55e', label: 'Available' },
-        exhausted:   { bg: 'rgba(239,68,68,0.08)',   border: 'rgba(239,68,68,0.2)',  dot: '#ef4444', label: 'Exhausted' },
-        not_found:   { bg: 'rgba(100,116,139,0.08)', border: 'rgba(100,116,139,0.2)',dot: '#64748b', label: 'Not found' },
-        unreachable: { bg: 'rgba(245,158,11,0.08)',  border: 'rgba(245,158,11,0.2)', dot: '#f59e0b', label: 'Unreachable' },
-        error:       { bg: 'rgba(239,68,68,0.06)',   border: 'rgba(239,68,68,0.15)', dot: '#ef4444', label: 'Error' },
-      };
-      const s = statusColors[m.status] || statusColors.error;
-      const isPrimary = m.is_primary;
+      const s = {
+        available:   { bg:'rgba(74,222,128,0.06)',  border:'rgba(74,222,128,0.18)',  dot:'#4ade80', label:'Available' },
+        exhausted:   { bg:'rgba(248,113,113,0.06)', border:'rgba(248,113,113,0.18)', dot:'#f87171', label:'Exhausted' },
+        not_found:   { bg:'rgba(90,88,112,0.08)',   border:'rgba(90,88,112,0.2)',    dot:'#5a5870', label:'Not found' },
+        unreachable: { bg:'rgba(251,191,36,0.06)',  border:'rgba(251,191,36,0.18)',  dot:'#fbbf24', label:'Unreachable' },
+        error:       { bg:'rgba(248,113,113,0.05)', border:'rgba(248,113,113,0.12)', dot:'#f87171', label:'Error' },
+      }[m.status] || { bg:'rgba(248,113,113,0.05)', border:'rgba(248,113,113,0.12)', dot:'#f87171', label:'Error' };
 
-      return `<div style="padding:10px 12px;border-radius:8px;background:${s.bg};border:1px solid ${s.border};
-        margin-bottom:6px;display:flex;align-items:center;gap:10px;
-        ${isPrimary ? 'box-shadow:0 0 0 1px rgba(59,130,246,0.2);' : ''}">
-        <div style="width:7px;height:7px;border-radius:50%;background:${s.dot};flex-shrink:0;
-          ${m.status==='available' ? 'box-shadow:0 0 6px '+s.dot : ''}"></div>
+      return `<div style="padding:10px 12px;border-radius:7px;background:${s.bg};border:1px solid ${s.border};
+        margin-bottom:6px;display:flex;align-items:center;gap:10px;">
+        <div style="width:6px;height:6px;border-radius:50%;background:${s.dot};flex-shrink:0;
+          ${m.status==='available'?'box-shadow:0 0 6px '+s.dot:''}"></div>
         <div style="flex:1;min-width:0;">
-          <div style="font-size:11.5px;font-weight:600;color:var(--text);font-family:var(--font);
+          <div style="font-size:11.5px;font-weight:600;color:var(--text);font-family:var(--mono);
             white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
-            ${m.model}${isPrimary ? ' <span style="font-size:9px;color:var(--cyan);margin-left:4px;">★ primary</span>' : ''}
+            ${m.model}${m.is_primary?' <span style="font-size:9px;color:var(--accent);margin-left:5px;">primary</span>':''}
           </div>
           <div style="font-size:10px;color:var(--text3);margin-top:1px;font-family:var(--font)">
-            ${m.daily_limit} req/day free · ${m.eval_runs} runs tracked
+            ${m.daily_limit} req/day · ${m.eval_runs} tracked
           </div>
         </div>
-        <div style="font-size:10.5px;font-weight:600;color:${s.dot};font-family:var(--font);white-space:nowrap;">
-          ${s.label}
-        </div>
+        <div style="font-size:10.5px;font-weight:600;color:${s.dot};font-family:var(--mono);white-space:nowrap;">${s.label}</div>
       </div>`;
     }
 
     let html = '';
     if (small.length) {
-      html += `<div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.6px;
-        font-family:var(--font);margin-bottom:6px;margin-top:4px;">Small tier — planning & parsing</div>`;
+      html += `<div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.7px;
+        font-family:var(--mono);margin:4px 0 7px;">Planning & parsing</div>`;
       html += small.map(modelCard).join('');
     }
     if (large.length) {
-      html += `<div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.6px;
-        font-family:var(--font);margin-bottom:6px;margin-top:12px;">Large tier — browser agent</div>`;
+      html += `<div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.7px;
+        font-family:var(--mono);margin:14px 0 7px;">Browser agent</div>`;
       html += large.map(modelCard).join('');
     }
 
-    list.innerHTML = html || '<div style="color:var(--text3);font-size:12px;">No models found</div>';
-
+    list.innerHTML = html || '<div style="color:var(--text3);font-size:12.5px;">No models found</div>';
     const avail = models.filter(m => m.status === 'available').length;
-    const total = models.length;
-    footer.innerHTML = `
-      <span style="color:${avail>0?'#22c55e':'#ef4444'}">${avail}/${total} models available</span>
-      &nbsp;·&nbsp; Quota resets: ${d.quota_resets}
-      &nbsp;·&nbsp; Key: ${d.key_hint}`;
-
+    footer.innerHTML = `<span style="color:${avail>0?'#4ade80':'#f87171'}">${avail}/${models.length} available</span>&nbsp;·&nbsp;Resets: ${d.quota_resets}&nbsp;·&nbsp;Key: ${d.key_hint}`;
   } catch(e) {
-    list.innerHTML = `<div style="color:var(--red);font-size:12px;">Failed to check models: ${e.message}</div>`;
+    list.innerHTML = `<div style="color:var(--red);font-size:12.5px;">Failed: ${e.message}</div>`;
   }
 }
 
 async function submitSeed() {
-  const site = document.getElementById('seed-site').value.trim();
-  const hint = document.getElementById('seed-hint').value.trim();
-  const category = document.getElementById('seed-category').value.trim();
-  const tipsRaw = document.getElementById('seed-tips').value.trim();
+  const site = document.getElementById('seed-site')?.value?.trim();
+  const hint = document.getElementById('seed-hint')?.value?.trim();
+  const category = document.getElementById('seed-category')?.value?.trim();
+  const tipsRaw = document.getElementById('seed-tips')?.value?.trim();
   if (!site) { toast('Site domain is required'); return; }
-
   const tips = tipsRaw ? tipsRaw.split('\n').filter(t => t.trim()) : [];
-  const works_for = category ? [category] : [];
-
   try {
     const r = await fetch(`${API}/tasks/knowledge/seed`, {
       method: 'POST', headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({site, navigation_hint: hint, category, tips, works_for})
+      body: JSON.stringify({site, navigation_hint: hint, category, tips, works_for: category ? [category] : []})
     });
     const d = await r.json();
-    toast(`✅ Taught agent about ${d.site}`);
-    document.getElementById('seed-site').value = '';
-    document.getElementById('seed-hint').value = '';
-    document.getElementById('seed-tips').value = '';
+    toast(`Taught agent about ${d.site}`);
   } catch(e) { toast('Failed to seed knowledge'); }
 }
 
 async function submitCorrection() {
-  const query = document.getElementById('corr-query').value.trim();
-  const wrong = document.getElementById('corr-wrong').value.trim();
-  const approach = document.getElementById('corr-approach').value.trim();
-  const bad = document.getElementById('corr-bad').value.trim();
-  const good = document.getElementById('corr-good').value.trim();
-
-  if (!wrong && !bad) { toast('Tell me what went wrong'); return; }
-
+  const bad = document.getElementById('corr-bad')?.value?.trim();
+  const good = document.getElementById('corr-good')?.value?.trim();
+  const wrong = document.getElementById('corr-wrong')?.value?.trim();
+  if (!wrong && !bad) { toast('Describe what went wrong'); return; }
   try {
     const r = await fetch(`${API}/tasks/knowledge/correct`, {
       method: 'POST', headers: {'Content-Type':'application/json'},
       body: JSON.stringify({
-        query, what_went_wrong: wrong,
-        correct_approach: approach, bad_site: bad, good_site: good
+        query: document.getElementById('corr-query')?.value?.trim() || '',
+        what_went_wrong: wrong,
+        correct_approach: document.getElementById('corr-approach')?.value?.trim() || '',
+        bad_site: bad, good_site: good
       })
     });
     const d = await r.json();
-    toast(`✅ Correction recorded — agent will avoid ${d.bad_site_penalized || 'bad sites'} next time`);
-    ['corr-query','corr-wrong','corr-approach','corr-bad','corr-good'].forEach(id => {
-      document.getElementById(id).value = '';
-    });
+    toast(`Correction recorded`);
   } catch(e) { toast('Failed to record correction'); }
 }
 
 async function loadKnowledge() {
   const el = document.getElementById('knowledge-view');
-  el.textContent = 'Loading...';
+  el.textContent = 'Loading…';
   try {
     const r = await fetch(`${API}/tasks/knowledge`);
     const d = await r.json();
     const sites = d.sites || {};
     const shortcuts = d.domain_shortcuts || {};
     const patterns = d.search_patterns || {};
-
-    let out = `=== SITES (${Object.keys(sites).length} known) ===\n`;
+    let out = `SITES (${Object.keys(sites).length} known)\n${'─'.repeat(40)}\n`;
     Object.entries(sites)
       .sort((a,b) => (b[1].success_count||0) - (a[1].success_count||0))
       .forEach(([domain, s]) => {
         out += `\n${domain}\n`;
-        out += `  ✅ ${s.success_count||0} success  ❌ ${s.fail_count||0} fail  ~${s.avg_steps||'?'} steps\n`;
-        if (s.navigation_hint) out += `  💡 ${s.navigation_hint}\n`;
-        (s.tips||[]).forEach(t => { out += `  → ${t}\n`; });
+        out += `  + ${s.success_count||0} success  - ${s.fail_count||0} fail  ~${s.avg_steps||'?'} steps\n`;
+        if (s.navigation_hint) out += `  > ${s.navigation_hint}\n`;
+        (s.tips||[]).forEach(t => { out += `  · ${t}\n`; });
       });
-
-    out += `\n=== DOMAIN SHORTCUTS ===\n`;
+    out += `\n\nDOMAIN SHORTCUTS\n${'─'.repeat(40)}\n`;
     Object.entries(shortcuts).forEach(([cat, sites]) => {
       out += `  ${cat}: ${sites.join(' → ')}\n`;
     });
-
-    out += `\n=== SEARCH PATTERNS ===\n`;
+    out += `\n\nSEARCH PATTERNS\n${'─'.repeat(40)}\n`;
     Object.entries(patterns).forEach(([cat, queries]) => {
       out += `  ${cat}:\n`;
       queries.forEach(q => { out += `    "${q}"\n`; });
     });
-
-    out += `\nLast updated: ${d.last_updated || 'never'}`;
+    out += `\nUpdated: ${d.last_updated || 'never'}`;
     el.textContent = out;
-  } catch(e) { el.textContent = 'Failed to load knowledge'; }
+  } catch(e) { el.textContent = 'Failed to load'; }
 }
 
 function useSugg(card) {
-  const text = card.innerText.trim();
+  const text = card.querySelector('span:last-child').innerText.trim();
   const el = document.getElementById('qinput');
   el.value = text; resize(el); el.focus();
 }
@@ -1350,8 +1364,7 @@ function hideEmpty() {
 }
 
 function scrollDown() {
-  const c = document.getElementById('chat');
-  c.scrollTop = c.scrollHeight;
+  document.getElementById('chat').scrollTop = document.getElementById('chat').scrollHeight;
 }
 
 function setBusy(v) {
