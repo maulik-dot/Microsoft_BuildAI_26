@@ -11,11 +11,11 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
-  /* Surfaces */
-  --bg:       #0c0c11;
-  --bg2:      #111118;
-  --bg3:      #16161f;
-  --bg4:      #1c1c27;
+  /* Surfaces — cool dark tinted */
+  --bg:       #06080f;
+  --bg2:      #0a0d18;
+  --bg3:      #0f1221;
+  --bg4:      #141828;
 
   /* Borders */
   --border:   rgba(255,255,255,0.06);
@@ -23,29 +23,34 @@
   --border3:  rgba(255,255,255,0.16);
 
   /* Text */
-  --text:     #f0ede8;
-  --text2:    #9b9aaa;
-  --text3:    #5a5870;
+  --text:     #eef0f8;
+  --text2:    #8a8faa;
+  --text3:    #484d66;
 
   /* Surface overlays */
   --surface:  rgba(255,255,255,0.03);
   --surface2: rgba(255,255,255,0.055);
 
-  /* Accent — warm amber, not generic blue */
-  --accent:      #c8956a;
-  --accent-dim:  rgba(200,149,106,0.12);
-  --accent-glow: rgba(200,149,106,0.25);
+  /* Primary accent — neon electric blue */
+  --accent:      #00c8ff;
+  --accent-dim:  rgba(0,200,255,0.10);
+  --accent-glow: rgba(0,200,255,0.30);
+
+  /* Secondary accent — neon pink/magenta */
+  --pink:      #ff3da1;
+  --pink-dim:  rgba(255,61,161,0.10);
+  --pink-glow: rgba(255,61,161,0.25);
 
   /* Semantic */
   --green:  #4ade80;
   --red:    #f87171;
   --yellow: #fbbf24;
-  --blue:   #60a5fa;
+  --blue:   #00c8ff;
 
   /* Aliases for backward compat */
-  --cyan:     #c8956a;
-  --cyan-dim: rgba(200,149,106,0.12);
-  --purple:   #8b85c1;
+  --cyan:     #00c8ff;
+  --cyan-dim: rgba(0,200,255,0.10);
+  --purple:   #ff3da1;
   --orange:   #f97316;
 
   /* Type */
@@ -86,8 +91,8 @@ body::after {
   content: '';
   position: fixed; inset: 0; z-index: 0; pointer-events: none;
   background:
-    radial-gradient(ellipse 60% 50% at 10% 0%, rgba(200,149,106,0.04) 0%, transparent 55%),
-    radial-gradient(ellipse 50% 60% at 90% 100%, rgba(96,130,250,0.04) 0%, transparent 55%);
+    radial-gradient(ellipse 65% 55% at 10% 0%, rgba(0,200,255,0.07) 0%, transparent 55%),
+    radial-gradient(ellipse 55% 65% at 90% 100%, rgba(255,61,161,0.07) 0%, transparent 55%);
 }
 
 /* ── HEADER ─────────────────────────────────────────────────────────── */
@@ -106,8 +111,8 @@ header {
 header::after {
   content: '';
   position: absolute; bottom: -1px; left: 0; right: 0; height: 1px;
-  background: linear-gradient(90deg, transparent, var(--accent) 40%, var(--blue) 60%, transparent);
-  opacity: 0.2;
+  background: linear-gradient(90deg, transparent, var(--accent) 30%, var(--pink) 70%, transparent);
+  opacity: 0.5;
 }
 
 .logo {
@@ -118,12 +123,12 @@ header::after {
 .logo-img {
   height: 44px; width: 44px;
   object-fit: contain; flex-shrink: 0;
-  filter: drop-shadow(0 2px 12px rgba(200,149,106,0.3));
+  filter: drop-shadow(0 2px 12px rgba(0,200,255,0.35));
   transition: filter 0.3s;
 }
 
 .logo-img:hover {
-  filter: drop-shadow(0 2px 20px rgba(200,149,106,0.5));
+  filter: drop-shadow(0 2px 22px rgba(0,200,255,0.6)) drop-shadow(0 0 8px rgba(255,61,161,0.3));
 }
 
 .logo-text-wrap { display: flex; flex-direction: column; gap: 1px; }
@@ -134,7 +139,10 @@ header::after {
   color: var(--text);
 }
 
-.logo-name span { color: var(--accent); }
+.logo-name span {
+  background: linear-gradient(90deg, var(--accent), var(--pink));
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+}
 
 .logo-tag {
   font-size: 9px; color: var(--text3);
@@ -225,8 +233,15 @@ main {
 .empty-orb::before {
   content: '';
   position: absolute; inset: -8px; border-radius: 24px;
-  border: 1px solid rgba(200,149,106,0.08);
+  border: 1px solid rgba(0,200,255,0.1);
   animation: spin 12s linear infinite;
+}
+
+.empty-orb::after {
+  content: '';
+  position: absolute; inset: -18px; border-radius: 30px;
+  border: 1px dashed rgba(255,61,161,0.06);
+  animation: spin 20s linear infinite reverse;
 }
 
 @keyframes spin { to { transform: rotate(360deg); } }
@@ -265,15 +280,15 @@ main {
 .sugg::before {
   content: '';
   position: absolute; inset: 0;
-  background: linear-gradient(135deg, rgba(200,149,106,0.06), transparent);
+  background: linear-gradient(135deg, rgba(0,200,255,0.05), rgba(255,61,161,0.03));
   opacity: 0; transition: opacity 0.2s;
 }
 
 .sugg:hover {
-  border-color: rgba(200,149,106,0.3);
+  border-color: rgba(0,200,255,0.35);
   color: var(--text);
   transform: translateY(-2px);
-  box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+  box-shadow: 0 8px 28px rgba(0,0,0,0.4), 0 0 0 1px rgba(0,200,255,0.08);
 }
 
 .sugg:hover::before { opacity: 1; }
@@ -344,7 +359,7 @@ main {
 .msg.agent .bubble {
   background: var(--bg3);
   border: 1px solid var(--border);
-  border-left: 2px solid rgba(200,149,106,0.2);
+  border-left: 2px solid rgba(0,200,255,0.3);
   border-bottom-left-radius: 3px;
   width: 100%; max-width: 100%;
 }
@@ -432,7 +447,7 @@ main {
 .thinking-bubble {
   background: var(--bg3);
   border: 1px solid var(--border);
-  border-left: 2px solid rgba(200,149,106,0.3);
+  border-left: 2px solid rgba(0,200,255,0.4);
   border-radius: var(--r-lg); border-bottom-left-radius: 3px;
   padding: 14px 18px;
   display: flex; align-items: center; gap: 14px;
@@ -641,8 +656,8 @@ main {
 }
 
 .input-wrap:focus-within {
-  border-color: rgba(200,149,106,0.4);
-  box-shadow: 0 0 0 3px rgba(200,149,106,0.07), 0 4px 24px rgba(0,0,0,0.35);
+  border-color: rgba(0,200,255,0.4);
+  box-shadow: 0 0 0 3px rgba(0,200,255,0.07), 0 0 0 6px rgba(255,61,161,0.03), 0 4px 24px rgba(0,0,0,0.4);
 }
 
 .input-top {
@@ -696,20 +711,20 @@ main {
 #send {
   height: 32px; padding: 0 18px;
   border-radius: var(--r-sm); border: none;
-  background: var(--accent);
-  color: #1a0e06;
+  background: linear-gradient(135deg, var(--accent), var(--pink));
+  color: #fff;
   font-size: 13.5px; font-weight: 700;
   font-family: var(--font); cursor: pointer;
   display: flex; align-items: center; gap: 6px;
   letter-spacing: 0.1px;
   transition: all 0.18s;
-  box-shadow: 0 2px 10px rgba(200,149,106,0.3);
+  box-shadow: 0 2px 14px rgba(0,200,255,0.25), 0 2px 14px rgba(255,61,161,0.15);
 }
 
 #send:hover {
-  filter: brightness(1.08);
+  filter: brightness(1.1);
   transform: translateY(-1px);
-  box-shadow: 0 4px 16px rgba(200,149,106,0.4);
+  box-shadow: 0 4px 20px rgba(0,200,255,0.35), 0 4px 20px rgba(255,61,161,0.2);
 }
 
 #send:disabled { opacity: 0.3; cursor: not-allowed; transform: none; box-shadow: none; }
