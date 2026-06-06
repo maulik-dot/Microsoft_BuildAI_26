@@ -93,7 +93,7 @@
     grid-template-columns: 1fr auto 1fr;
     align-items: center;
     padding: 0 20px;
-    height: 54px;
+    height: 64px;
     background: rgba(6,6,15,0.92);
     backdrop-filter: blur(24px);
     border-bottom: 1px solid var(--border);
@@ -114,14 +114,15 @@
   }
 
   .logo-img {
-    width: 36px; height: 36px;
+    width: 52px; height: 52px;
     object-fit: contain; flex-shrink: 0;
-    filter: drop-shadow(0 0 8px rgba(59,130,246,0.4));
-    transition: filter 0.3s ease;
+    filter: drop-shadow(0 0 10px rgba(59,130,246,0.5));
+    transition: filter 0.3s ease, transform 0.3s ease;
   }
 
   .logo-img:hover {
-    filter: drop-shadow(0 0 14px rgba(59,130,246,0.7));
+    filter: drop-shadow(0 0 18px rgba(59,130,246,0.8));
+    transform: scale(1.05);
   }
 
   .logo-text-wrap { display: flex; flex-direction: column; gap: 1px; }
@@ -808,29 +809,23 @@
     <button onclick="toggleTrainPanel()" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:18px;">✕</button>
   </div>
 
-  <!-- TAB SWITCHER -->
-  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:5px;margin-bottom:18px;">
+  <!-- TAB SWITCHER — agent self-trains, no manual tabs needed -->
+  <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:5px;margin-bottom:18px;">
     <button onclick="switchTab('models')" id="tab-models"
       style="padding:7px;border-radius:8px;border:1px solid var(--cyan);
       background:var(--cyan-dim);color:var(--cyan);font-size:11px;font-weight:600;cursor:pointer;font-family:var(--font)">
-      Models
-    </button>
-    <button onclick="switchTab('seed')" id="tab-seed"
-      style="padding:7px;border-radius:8px;border:1px solid var(--border);
-      background:var(--surface);color:var(--text2);font-size:11px;font-weight:600;cursor:pointer;font-family:var(--font)">
-      Seed
-    </button>
-    <button onclick="switchTab('correct')" id="tab-correct"
-      style="padding:7px;border-radius:8px;border:1px solid var(--border);
-      background:var(--surface);color:var(--text2);font-size:11px;font-weight:600;cursor:pointer;font-family:var(--font)">
-      Correct
+      🤖 Models
     </button>
     <button onclick="switchTab('view')" id="tab-view"
       style="padding:7px;border-radius:8px;border:1px solid var(--border);
       background:var(--surface);color:var(--text2);font-size:11px;font-weight:600;cursor:pointer;font-family:var(--font)">
-      Knowledge
+      🧠 What I Know
     </button>
   </div>
+  <p style="font-size:11px;color:var(--text3);margin-bottom:14px;line-height:1.5;font-family:var(--font);
+    padding:8px 10px;background:rgba(59,130,246,0.05);border-radius:6px;border-left:2px solid var(--blue)">
+    🐘 The agent self-trains after every search — it automatically learns which sites work fast, which to avoid, and the best navigation patterns.
+  </p>
 
   <!-- MODELS TAB -->
   <div id="pane-models">
@@ -848,79 +843,6 @@
       border:1px solid var(--border);font-size:11px;color:var(--text3);font-family:var(--font)"></div>
   </div>
 
-  <!-- SEED TAB -->
-  <div id="pane-seed">
-    <p style="font-size:12px;color:var(--text3);margin-bottom:14px;line-height:1.5;">
-      Teach the agent how to navigate a site without running it.
-    </p>
-    <label style="font-size:11px;color:var(--text2);display:block;margin-bottom:5px;">Site domain</label>
-    <input id="seed-site" placeholder="e.g. ixigo.com" style="width:100%;padding:8px 12px;border-radius:8px;
-      background:var(--bg3);border:1px solid var(--border);color:var(--text);font-family:var(--font);
-      font-size:13px;outline:none;margin-bottom:10px;">
-
-    <label style="font-size:11px;color:var(--text2);display:block;margin-bottom:5px;">Category</label>
-    <input id="seed-category" placeholder="e.g. travel, jobs, price_comparison" style="width:100%;padding:8px 12px;border-radius:8px;
-      background:var(--bg3);border:1px solid var(--border);color:var(--text);font-family:var(--font);
-      font-size:13px;outline:none;margin-bottom:10px;">
-
-    <label style="font-size:11px;color:var(--text2);display:block;margin-bottom:5px;">Navigation hint</label>
-    <textarea id="seed-hint" rows="3" placeholder="e.g. Enter city in From/To fields, wait for dropdown, click Search button"
-      style="width:100%;padding:8px 12px;border-radius:8px;background:var(--bg3);border:1px solid var(--border);
-      color:var(--text);font-family:var(--font);font-size:13px;outline:none;resize:vertical;margin-bottom:10px;"></textarea>
-
-    <label style="font-size:11px;color:var(--text2);display:block;margin-bottom:5px;">Tips (one per line)</label>
-    <textarea id="seed-tips" rows="3" placeholder="Results take 3-5s to load&#10;Non-stop filter on left panel"
-      style="width:100%;padding:8px 12px;border-radius:8px;background:var(--bg3);border:1px solid var(--border);
-      color:var(--text);font-family:var(--font);font-size:13px;outline:none;resize:vertical;margin-bottom:14px;"></textarea>
-
-    <button onclick="submitSeed()" style="width:100%;padding:10px;border-radius:8px;border:none;
-      background:linear-gradient(135deg,var(--cyan),var(--purple));color:#000;font-weight:700;
-      font-family:var(--font);font-size:13px;cursor:pointer;">
-      Teach Agent →
-    </button>
-  </div>
-
-  <!-- CORRECT TAB -->
-  <div id="pane-correct" style="display:none">
-    <p style="font-size:12px;color:var(--text3);margin-bottom:14px;line-height:1.5;">
-      When the agent got something wrong, tell it what it should have done instead.
-    </p>
-    <label style="font-size:11px;color:var(--text2);display:block;margin-bottom:5px;">What was the query?</label>
-    <input id="corr-query" placeholder="e.g. find cheapest flights Mumbai Delhi" style="width:100%;padding:8px 12px;border-radius:8px;
-      background:var(--bg3);border:1px solid var(--border);color:var(--text);font-family:var(--font);
-      font-size:13px;outline:none;margin-bottom:10px;">
-
-    <label style="font-size:11px;color:var(--text2);display:block;margin-bottom:5px;">What went wrong?</label>
-    <textarea id="corr-wrong" rows="2" placeholder="e.g. Agent tried MakeMyTrip which blocked it"
-      style="width:100%;padding:8px 12px;border-radius:8px;background:var(--bg3);border:1px solid var(--border);
-      color:var(--text);font-family:var(--font);font-size:13px;outline:none;resize:vertical;margin-bottom:10px;"></textarea>
-
-    <label style="font-size:11px;color:var(--text2);display:block;margin-bottom:5px;">What should it do instead?</label>
-    <textarea id="corr-approach" rows="2" placeholder="e.g. Go directly to ixigo.com/flights"
-      style="width:100%;padding:8px 12px;border-radius:8px;background:var(--bg3);border:1px solid var(--border);
-      color:var(--text);font-family:var(--font);font-size:13px;outline:none;resize:vertical;margin-bottom:10px;"></textarea>
-
-    <div style="display:flex;gap:8px;margin-bottom:14px;">
-      <div style="flex:1">
-        <label style="font-size:11px;color:var(--red);display:block;margin-bottom:5px;">Bad site (to avoid)</label>
-        <input id="corr-bad" placeholder="makemytrip.com" style="width:100%;padding:8px 12px;border-radius:8px;
-          background:var(--bg3);border:1px solid rgba(239,68,68,.3);color:var(--text);font-family:var(--font);
-          font-size:13px;outline:none;">
-      </div>
-      <div style="flex:1">
-        <label style="font-size:11px;color:var(--green);display:block;margin-bottom:5px;">Good site (use this)</label>
-        <input id="corr-good" placeholder="ixigo.com" style="width:100%;padding:8px 12px;border-radius:8px;
-          background:var(--bg3);border:1px solid rgba(16,185,129,.3);color:var(--text);font-family:var(--font);
-          font-size:13px;outline:none;">
-      </div>
-    </div>
-
-    <button onclick="submitCorrection()" style="width:100%;padding:10px;border-radius:8px;border:none;
-      background:linear-gradient(135deg,var(--orange),var(--red));color:#fff;font-weight:700;
-      font-family:var(--font);font-size:13px;cursor:pointer;">
-      Submit Correction →
-    </button>
-  </div>
 
   <!-- VIEW TAB -->
   <div id="pane-view" style="display:none">
@@ -1243,7 +1165,7 @@ function toggleTrainPanel() {
 }
 
 function switchTab(tab) {
-  ['models','seed','correct','view'].forEach(t => {
+  ['models','view'].forEach(t => {
     const pane = document.getElementById(`pane-${t}`);
     if (pane) pane.style.display = t === tab ? 'block' : 'none';
     const btn = document.getElementById(`tab-${t}`);

@@ -56,34 +56,138 @@ def _save(knowledge: dict):
 def learn_from_run(query: str, steps: list[dict], result: str, success: bool):
     """
     Called after every task completes. Extracts lessons and updates knowledge base.
+    The agent self-judges what to seed (fast/reliable) and what to correct (blocked/slow).
 
     steps: list of {step, url, title, action, detail, description}
     result: the final answer text
     success: whether the task produced a good result
     """
     if not steps and not result:
-        return  # Nothing to learn from
+        return
 
     knowledge = _load()
 
-    # 1. Extract which sites were visited and their outcomes
+    # 1. Track site performance
     _learn_site_performance(knowledge, steps, result, success)
 
-    # 2. Extract effective search queries
+    # 2. Learn effective search queries
     _learn_search_patterns(knowledge, query, steps, result, success)
 
-    # 3. Extract navigation patterns for successful sites
+    # 3. Auto-generate navigation hints from successful runs
     if success and steps:
         _learn_navigation_patterns(knowledge, steps, result)
 
-    # 4. Extract obstacle solutions
+    # 4. Learn obstacle solutions
     _learn_obstacle_solutions(knowledge, steps, result)
 
-    # 5. Update domain shortcuts (best sites for this type of query)
+    # 5. Update domain shortcuts
     if success:
         _update_domain_shortcuts(knowledge, query, steps)
 
+    # 6. AUTO-SEED: if a site completed in ≤10 steps → mark as fast/reliable
+    _auto_seed_fast_sites(knowledge, steps, success)
+
+    # 7. AUTO-CORRECT: if bot detection or blocks detected → auto-penalise
+    _auto_correct_blocked_sites(knowledge, steps, result)
+
     _save(knowledge)
+
+
+def _auto_seed_fast_sites(knowledge: dict, steps: list, success: bool):
+    """
+    Auto-seed sites that completed tasks efficiently (≤10 steps).
+    These are the agent's 'go-to' sites — reliable and fast.
+    """
+    if not success or not steps:
+        return
+
+    sites_node = knowledge.setdefault("sites", {})
+
+    # Count steps per domain
+    domain_steps: dict[str, int] = {}
+    for step in steps:
+        url = step.get("url", "")
+        if not url:
+            continue
+        try:
+            domain = re.sub(r'^(https?://)?(www\.)?', '', url).split('/')[0].split('?')[0]
+            if domain and '.' in domain and len(domain) > 4:
+                domain_steps[domain] = domain_steps.get(domain, 0) + 1
+        except Exception:
+            pass
+
+    for domain, count in domain_steps.items():
+        site = sites_node.setdefault(domain, {
+            "success_count": 0, "fail_count": 0, "avg_steps": 0,
+            "total_steps": 0, "runs": 0, "tips": [], "navigation_hint": "", "last_seen": None,
+        })
+
+        # Fast site: ≤10 steps → auto-boost as reliable
+        if count <= 10:
+            site["success_count"] = site.get("success_count", 0) + 1
+            existing_tips = site.get("tips", [])
+            fast_tip = f"Completes in ~{count} steps — fast and reliable"
+            if not any("Completes in" in t for t in existing_tips):
+                existing_tips.append(fast_tip)
+                site["tips"] = existing_tips[:5]
+
+        # Slow site: >18 steps → note as slow but functional
+        elif count > 18:
+            existing_tips = site.get("tips", [])
+            slow_tip = f"Takes {count}+ steps — consider alternatives if time-sensitive"
+            existing_tips = [t for t in existing_tips if "Takes" not in t]
+            existing_tips.append(slow_tip)
+            site["tips"] = existing_tips[:5]
+
+
+def _auto_correct_blocked_sites(knowledge: dict, steps: list, result: str):
+    """
+    Auto-detect and penalise sites that blocked the agent.
+    No human input needed — agent judges from its own experience.
+    """
+    if not steps:
+        return
+
+    sites_node = knowledge.setdefault("sites", {})
+    result_lower = (result or "").lower()
+
+    # Strong block signals
+    block_signals = ["captcha", "bot detection", "403", "blocked", "access denied",
+                     "cloudflare", "verify you are human", "unusual traffic"]
+
+    # Count steps per domain and check for blocks
+    domain_steps: dict[str, list] = {}
+    for step in steps:
+        url = step.get("url", "")
+        desc = (step.get("description", "") + step.get("detail", "")).lower()
+        if not url:
+            continue
+        try:
+            domain = re.sub(r'^(https?://)?(www\.)?', '', url).split('/')[0].split('?')[0]
+            if domain and '.' in domain:
+                domain_steps.setdefault(domain, []).append(desc)
+        except Exception:
+            pass
+
+    from backend.memory.agent_memory import mark_blocked, mark_works, _load as load_mem, _save as save_mem
+
+    for domain, descs in domain_steps.items():
+        combined_desc = " ".join(descs)
+        is_blocked = any(sig in combined_desc for sig in block_signals) or \
+                     any(sig in result_lower[max(0, result_lower.find(domain)-200):
+                         result_lower.find(domain)+200] for sig in block_signals if domain in result_lower)
+
+        if is_blocked:
+            # Auto-correct: penalise this site in memory
+            site = sites_node.setdefault(domain, {"success_count": 0, "fail_count": 0})
+            site["fail_count"] = site.get("fail_count", 0) + 1
+            if not any("bot detection" in (t or "").lower() for t in site.get("tips", [])):
+                site.setdefault("tips", []).append("⚠️ Bot detection detected — agent auto-penalised")
+            mark_blocked("research", domain)
+
+        # If domain appears in result AND no block signals → auto-confirm as working
+        elif domain in result_lower and not is_blocked:
+            mark_works("research", domain)
 
 
 def _learn_site_performance(knowledge: dict, steps: list, result: str, success: bool):
