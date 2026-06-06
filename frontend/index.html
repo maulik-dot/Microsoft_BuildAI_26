@@ -1277,6 +1277,7 @@ async function poll(taskId) {
       chatHistory.push({role: "agent", content: displayText.slice(0, 2000)});
       if (chatHistory.length > MAX_HISTORY) chatHistory = chatHistory.slice(-MAX_HISTORY);
       _saveAfterReply();
+      notifyDone(); // signal completion
       setBusy(false);
       return;
     }
@@ -1788,6 +1789,59 @@ function esc(s) {
 }
 
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+// ── DONE NOTIFICATION ─────────────────────────────────────────────────
+function notifyDone() {
+  // 1. Tab title flashes with ✓ then resets
+  const original = document.title;
+  document.title = '✓ Result ready — Vayu';
+  setTimeout(() => { document.title = original; }, 4000);
+
+  // 2. Subtle chime using Web Audio API — no file needed
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const notes = [523, 659, 784]; // C5, E5, G5 — pleasant chord
+    notes.forEach((freq, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.type = 'sine';
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0, ctx.currentTime + i * 0.1);
+      gain.gain.linearRampToValueAtTime(0.08, ctx.currentTime + i * 0.1 + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.1 + 0.5);
+      osc.start(ctx.currentTime + i * 0.1);
+      osc.stop(ctx.currentTime + i * 0.1 + 0.5);
+    });
+  } catch {}
+
+  // 3. Flash the latest agent message with a neon pulse
+  const msgs = document.querySelectorAll('.msg.agent .bubble');
+  const last = msgs[msgs.length - 1];
+  if (last) {
+    last.style.transition = 'box-shadow 0.3s';
+    last.style.boxShadow = '0 0 30px rgba(0,200,255,0.4), 0 0 60px rgba(255,61,161,0.2)';
+    setTimeout(() => {
+      last.style.boxShadow = '';
+    }, 1800);
+  }
+
+  // 4. Browser notification (if user granted permission)
+  if (Notification.permission === 'granted') {
+    new Notification('Vayu · Research complete', {
+      body: 'Your results are ready.',
+      icon: '/static/logo.png',
+      silent: true,
+    });
+  }
+}
+
+// Request notification permission silently on first interaction
+document.addEventListener('click', () => {
+  if (Notification.permission === 'default') {
+    Notification.requestPermission();
+  }
+}, { once: true });
 
 // Initialise session and suggestions on startup
 currentChatId = genId();
