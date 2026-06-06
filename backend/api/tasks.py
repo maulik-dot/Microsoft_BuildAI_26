@@ -50,9 +50,20 @@ async def start_research(request: ResearchRequest, background_tasks: BackgroundT
     async def run():
         _update(task_id, status="running")
         try:
-            from backend.tools.task_router import route
+            import asyncio
+            from backend.tools.task_router import route, classify
             from backend.tools.context_resolver import resolve_query
-            resolved_query = resolve_query(request.query, request.context)
+
+            # Parallelize: resolve follow-up + classify intent at the same time
+            resolved_query, task_type = await asyncio.gather(
+                asyncio.get_event_loop().run_in_executor(
+                    None, resolve_query, request.query, request.context
+                ),
+                asyncio.get_event_loop().run_in_executor(
+                    None, classify, request.query
+                ),
+            )
+
             result = await route(resolved_query, task_id=task_id)
             if result.get("status") == "waiting_user":
                 _update(task_id,

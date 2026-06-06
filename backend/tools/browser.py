@@ -25,9 +25,10 @@ def _make_browser(keep_alive: bool = True) -> Browser:
             headless=False,
             disable_security=True,
             keep_alive=keep_alive,
-            # Principle 3: give agent time to observe after page loads
-            minimum_wait_page_load_time=0.8,
-            wait_between_actions=0.4,
+            minimum_wait_page_load_time=0.5,
+            wait_between_actions=0.3,
+            # Disable default extensions (uBlock, cookie banners) — saves 3-8s startup
+            enable_default_extensions=False,
             user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36",
         )
     )
@@ -234,19 +235,17 @@ async def run_deep_task(task: str, task_type: str = "", task_id: str = "",
     # Inject what agent has learned from previous runs
     learned_ctx = get_learned_context(task)
 
-    browser = _make_browser(keep_alive=False)
-    try:
-        agent = _make_agent(task, browser, task_type, task_id, temporal, learned_ctx)
-        history = await agent.run(max_steps=max_steps)
-        result = _extract_best_result(history)
+    # Use the warm persistent browser — avoids 10-15s cold-start every call
+    browser = await get_browser()
+    agent = _make_agent(task, browser, task_type, task_id, temporal, learned_ctx)
+    history = await agent.run(max_steps=max_steps)
+    result = _extract_best_result(history)
 
-        # Learn from this run — update web knowledge base
-        steps = _step_logs.get(task_id, [])
-        learn_from_run(task, steps, result, success=bool(result and len(result) > 80))
+    # Learn from this run
+    steps = _step_logs.get(task_id, [])
+    learn_from_run(task, steps, result, success=bool(result and len(result) > 80))
 
-        return result
-    finally:
-        await browser.close()
+    return result
 
 
 async def run_parallel_tasks(tasks: list[str], task_type: str = "",

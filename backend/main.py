@@ -18,6 +18,13 @@ from backend.monitoring.scheduler import start_scheduler, stop_scheduler
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     start_scheduler()
+    # Pre-warm browser so first query starts instantly
+    try:
+        from backend.tools.browser import get_browser
+        await get_browser()
+        print("[Vayu] Browser pre-warmed and ready")
+    except Exception as e:
+        print(f"[Vayu] Browser pre-warm failed (will start on first query): {e}")
     yield
     stop_scheduler()
     from backend.tools.browser import close_browser
