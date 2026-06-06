@@ -33,10 +33,10 @@ SMALL_MODELS = [
 
 # Large = most capable available. Used when reasoning quality matters.
 LARGE_MODELS = [
-    "gemini-2.5-flash",          # Best reasoning, 20 req/day free
-    "gemini-3.5-flash",          # Second best, 20 req/day free
-    "gemini-2.0-flash",          # Solid, higher quota
-    "gemini-3.1-flash-lite",     # Fallback if large models exhausted
+    "gemini-3.1-flash-lite",     # High rate limit — most reliable for long tasks
+    "gemini-2.5-flash",          # Best reasoning when available
+    "gemini-3.5-flash",          # Only 5 req/min on some keys — fallback
+    "gemini-2.0-flash",          # Additional fallback
 ]
 
 # Task → Tier routing table

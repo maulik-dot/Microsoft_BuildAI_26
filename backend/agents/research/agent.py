@@ -70,7 +70,7 @@ async def run_research(query: str, task_id: str = "") -> dict:
         task = _build_task(refined_query, memory_ctx, current_plan, scratchpad, success_condition, temporal_intent)
 
         # Fewer steps on retries — more focused
-        max_steps = 20 if attempt == 0 else 12
+        max_steps = 30 if attempt == 0 else 18
 
         # ── 4. BROWSER EXECUTION ──────────────────────────────────────────
         browser_model = get_model_for_tier(ModelTier.LARGE)

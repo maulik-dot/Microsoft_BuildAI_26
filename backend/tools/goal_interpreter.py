@@ -4,6 +4,7 @@ Detects ambiguity, generates one clarifying question, and defines the success co
 """
 
 import json
+from datetime import datetime
 from backend.tools.planner import _call_llm
 # Uses SMALL model — ambiguity detection is a simple classification task
 
@@ -17,9 +18,11 @@ def interpret(query: str) -> dict:
         success_condition: str           — what "done" looks like
         refined_query: str               — cleaned-up version of the query
     """
-    CURRENT_YEAR = "2026"
+    now = datetime.now()
+    CURRENT_YEAR = str(now.year)
+    CURRENT_DATE = now.strftime("%B %d, %Y")  # e.g. "June 05, 2026"
 
-    prompt = f"""You are a query analyst for a web research agent. Today's year is {CURRENT_YEAR}.
+    prompt = f"""You are a query analyst for a web research agent. Today's date is {CURRENT_DATE}.
 
 Analyse this user query and return JSON with exactly these fields:
 
