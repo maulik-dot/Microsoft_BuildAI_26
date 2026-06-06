@@ -89,9 +89,18 @@ def _make_agent(task: str, browser: Browser, task_type: str = "",
         except Exception:
             pass
 
+    # Fallback LLM — always gemini-3.1-flash-lite (highest rate limit)
+    from browser_use.llm.google.chat import ChatGoogle as _ChatGoogle
+    fallback_llm = _ChatGoogle(
+        model="gemini-3.1-flash-lite",
+        api_key=settings.google_api_key,
+        temperature=0,
+    )
+
     return Agent(
         task=task,
         llm=get_llm(),
+        fallback_llm=fallback_llm,
         browser=browser,
 
         # ── Timeouts ──
@@ -115,6 +124,9 @@ def _make_agent(task: str, browser: Browser, task_type: str = "",
         use_vision=True,               # Screenshot + DOM together
         use_thinking=True,             # Chain-of-thought before every action
 
+        # Don't append internal todo.md/results.md to the final answer
+        display_files_in_done_text=False,
+
         # ── System context: all 7 principles + learned memory + site knowledge ──
         extend_system_message=get_system_context(task_type, temporal=temporal)
             + ("\n\n" + learned_ctx if learned_ctx else ""),
@@ -132,28 +144,73 @@ def clear_steps(task_id: str):
     _step_logs.pop(task_id, None)
 
 
+def _strip_attachments(text: str) -> str:
+    """
+    Remove internal agent scaffolding from final output:
+    - todo.md / results.md file contents
+    - 'Attachments:' section
+    - Action log lines (🔗 Navigated, Typed, Clicked, etc.)
+    """
+    if not text:
+        return text
+
+    # Cut everything from "Attachments:" onwards
+    for marker in ["Attachments:", "\nAttachments\n", "---\ntodo.md", "---\nresults.md"]:
+        if marker in text:
+            text = text[:text.index(marker)].strip()
+
+    # Remove individual action log lines
+    ACTION_PREFIXES = (
+        "🔗", "Typed ", "Clicked ", "Scrolled", "Navigated",
+        "Successfully replaced", "💡", "Opened new tab",
+        "[ ]", "[x]", "# Parking", "# Travel", "# Research",
+        "Tasks:", "## Tasks",
+    )
+    lines = text.split('\n')
+    clean_lines = [l for l in lines if not any(l.strip().startswith(p) for p in ACTION_PREFIXES)]
+    return "\n".join(clean_lines).strip()
+
+
 def _extract_best_result(agent_history) -> str:
-    """Fallback chain: final_result → extracted_content → action_results."""
-    final = agent_history.final_result()
-    if final and len(final.strip()) > 50:
+    """Fallback chain: final_result → filtered extracted_content → action_results."""
+    ACTION_PREFIXES = (
+        "🔗", "Typed ", "Clicked ", "Scrolled", "Navigated",
+        "Successfully replaced", "💡", "✅", "❌", "📄",
+        "[ ]", "[x]", "Opened new tab",
+    )
+
+    def is_action_log(text: str) -> bool:
+        t = text.strip()
+        return any(t.startswith(p) for p in ACTION_PREFIXES) or len(t) < 60
+
+    # 1. Try official final result — strip attachments first
+    final = _strip_attachments(agent_history.final_result() or "")
+    if final and len(final.strip()) > 80 and not is_action_log(final):
         return final
+
+    # 2. Try extracted_content — filter action logs and attachments
     try:
-        extracted = agent_history.extracted_content()
-        if extracted and len(extracted.strip()) > 20:
-            return extracted
+        extracted = _strip_attachments(agent_history.extracted_content() or "")
+        if extracted:
+            lines = [l for l in extracted.split('\n') if l.strip() and not is_action_log(l)]
+            clean = "\n".join(lines).strip()
+            if len(clean) > 80:
+                return clean
     except Exception:
         pass
+
+    # 3. Try action_results
     try:
-        collected = [
-            str(r.extracted_content).strip()
-            for r in agent_history.action_results()
-            if getattr(r, "extracted_content", None)
-            and len(str(r.extracted_content).strip()) > 20
-        ]
+        collected = []
+        for r in agent_history.action_results():
+            content = _strip_attachments(str(getattr(r, "extracted_content", "") or "").strip())
+            if content and len(content) > 80 and not is_action_log(content):
+                collected.append(content)
         if collected:
             return "\n\n".join(collected)
     except Exception:
         pass
+
     return ""
 
 
