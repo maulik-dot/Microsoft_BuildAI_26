@@ -1169,7 +1169,7 @@ async function poll(taskId) {
       const text = result.result || result.summary || '';
       const displayText = text || 'Task completed — no result returned. Try rephrasing.';
       addAgentMsg(displayText);
-      chatHistory.push({role: "agent", content: displayText.slice(0, 600)});
+      chatHistory.push({role: "agent", content: displayText.slice(0, 2000)});
       if (chatHistory.length > MAX_HISTORY) chatHistory = chatHistory.slice(-MAX_HISTORY);
       setBusy(false);
       return;

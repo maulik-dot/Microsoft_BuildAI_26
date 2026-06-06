@@ -1,72 +1,88 @@
 """
 Context Resolver — resolves follow-up queries using conversation history.
 
-Examples:
-  History: "Find Django courses under ₹999 on Udemy"
-  New query: "what about free ones?"
-  Resolved: "Find free Django courses on YouTube or other free platforms"
+Key fix: when a follow-up uses pronouns ("their", "them", "those", "its")
+or references ("the books", "these jobs", "the first one"), extract the
+specific items from the previous agent response and name them explicitly.
 
-  History: "Compare Samsung S24 prices on Flipkart and Amazon"
-  New query: "which one should I buy?"
-  Resolved: "Based on the Samsung S24 price comparison on Flipkart and Amazon, which one offers better value to buy?"
+Examples:
+  History: agent listed "Verity by Colleen Hoover, Gone Girl by Gillian Flynn, The Silent Patient"
+  Follow-up: "what are their prices?"
+  Resolved: "What are the prices of Verity by Colleen Hoover, Gone Girl by Gillian Flynn, and The Silent Patient?"
+
+  History: agent found "Python Developer at TCS ₹8L, Software Engineer at Infosys"
+  Follow-up: "which one has better growth?"
+  Resolved: "Between Python Developer at TCS and Software Engineer at Infosys, which has better growth?"
 """
 
 from backend.tools.planner import _call_llm
 
 
+REFERENCE_WORDS = [
+    "their", "them", "those", "these", "its", "it",
+    "the book", "the books", "the first", "the second", "the third",
+    "that one", "which one", "the job", "the jobs", "the product",
+    "the course", "the flight", "the hotel", "the price", "the prices",
+    "all of them", "any of them", "the last one", "the same",
+    "what about", "how about", "and also", "compare them",
+    "cheaper", "better", "different", "free", "paid", "similar",
+]
+
+
 def resolve_query(query: str, context: list[dict]) -> str:
     """
-    If the query is a follow-up (uses pronouns, references previous topic),
-    resolve it into a fully standalone question using conversation history.
-
-    If the query is self-contained, return it unchanged.
+    Resolve follow-up queries using full conversation context.
+    Extracts specific named items from previous agent responses
+    so the agent doesn't lose track of what was discussed.
     """
     if not context:
         return query
 
-    # Quick check — if query is clearly standalone, skip resolution
-    standalone_signals = len(query.split()) > 8 and not any(
-        w in query.lower() for w in [
-            "it", "that", "those", "them", "this", "these",
-            "what about", "how about", "same", "also", "too",
-            "another", "more", "else", "instead", "other",
-            "cheaper", "better", "different", "free", "paid"
-        ]
-    )
-    if standalone_signals:
+    q_lower = query.lower()
+
+    # Quick check — if standalone query, return as-is
+    has_reference = any(w in q_lower for w in REFERENCE_WORDS)
+    is_short = len(query.split()) <= 10
+    is_follow_up = has_reference or is_short
+
+    if not is_follow_up and len(query.split()) > 10:
         return query
 
-    # Build conversation summary (last 6 turns max)
+    # Get the last 6 turns
     recent = context[-6:]
+
+    # Build conversation text — include full agent responses for entity extraction
     conv_lines = []
     for msg in recent:
-        role = "User" if msg.get("role") == "user" else "Agent"
-        content = str(msg.get("content", ""))[:200]
+        role = "User" if msg.get("role") == "user" else "Vayu (agent)"
+        content = str(msg.get("content", ""))[:800]  # enough to capture names/titles
         conv_lines.append(f"{role}: {content}")
 
     conv_text = "\n".join(conv_lines)
 
-    prompt = f"""You are resolving a follow-up question in a conversation.
+    prompt = f"""You are resolving a follow-up question in a conversation. The user may reference things from previous messages using pronouns or vague terms.
 
-CONVERSATION SO FAR:
+CONVERSATION HISTORY:
 {conv_text}
 
 NEW MESSAGE FROM USER: "{query}"
 
-Task: If the new message is a follow-up that references something from the conversation (using pronouns, comparisons, or implicit references), rewrite it as a fully standalone question that makes sense without the conversation context.
-
-If the message is already standalone and self-contained, return it exactly as-is.
+Your task:
+1. Identify what specific items/entities the user is referring to (books, jobs, products, prices, etc.)
+2. Extract their EXACT names/titles from the conversation history
+3. Rewrite the user's message as a fully standalone question that explicitly names those items
 
 Rules:
-- Keep the rewritten question natural and concise
-- Preserve the user's original intent
-- Don't add information that wasn't implied
+- If the previous agent response listed specific items (books, jobs, prices, products), NAME THEM in the resolved query
+- Do not be vague — "their prices" must become "prices of [exact item names]"
+- Keep the user's original intent intact
+- If the query is already standalone and specific, return it unchanged
 - Return ONLY the resolved question, nothing else
 
-Examples:
-- "what about free ones?" after Django course search → "Find free Django courses on YouTube or other platforms"
-- "which is better value?" after price comparison → "Based on the Samsung S24 comparison, which offers better value: Flipkart or Amazon?"
-- "find me Python jobs in Mumbai" (standalone) → "find me Python jobs in Mumbai"
+Examples of good resolution:
+- "what are their prices?" after listing 3 books → "What are the current prices of [Book 1], [Book 2], and [Book 3] on Amazon or Flipkart?"
+- "which is cheaper?" after price comparison → "Between [Product A at ₹X] and [Product B at ₹Y], which is the cheaper option?"
+- "find me Python jobs in Mumbai" (standalone) → "find me Python jobs in Mumbai" (unchanged)
 
 Resolved question:"""
 
@@ -75,4 +91,9 @@ Resolved question:"""
         return query
 
     resolved = resolved.strip().strip('"').strip("'")
-    return resolved if resolved else query
+
+    # Sanity check — if resolution is way too long or clearly wrong, fall back
+    if len(resolved) > 500 or not resolved:
+        return query
+
+    return resolved
