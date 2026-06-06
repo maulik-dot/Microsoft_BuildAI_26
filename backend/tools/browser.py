@@ -230,21 +230,37 @@ async def run_browser_task(task: str, task_type: str = "", task_id: str = "",
 
 async def run_deep_task(task: str, task_type: str = "", task_id: str = "",
                         temporal: bool = False, max_steps: int = 35) -> str:
+    global _browser
     from backend.tools.learner import get_learned_context, learn_from_run
 
-    # Inject what agent has learned from previous runs
     learned_ctx = get_learned_context(task)
 
-    # Use the warm persistent browser — avoids 10-15s cold-start every call
-    browser = await get_browser()
-    agent = _make_agent(task, browser, task_type, task_id, temporal, learned_ctx)
-    history = await agent.run(max_steps=max_steps)
-    result = _extract_best_result(history)
+    # Always create a fresh browser for each task.
+    # The warm browser's internal session gets reset after each run,
+    # which leaves it in a state that breaks the next agent.
+    # Pre-warm at startup handles cold-start for the first query;
+    # subsequent tasks get a clean browser quickly since the OS has Chromium cached.
+    browser = _make_browser(keep_alive=False)
+    try:
+        agent = _make_agent(task, browser, task_type, task_id, temporal, learned_ctx)
+        history = await agent.run(max_steps=max_steps)
+        result = _extract_best_result(history)
+    finally:
+        try:
+            await browser.close()
+        except Exception:
+            pass
+        # Refresh the warm browser for the next task
+        async with _browser_lock:
+            if _browser:
+                try:
+                    await _browser.close()
+                except Exception:
+                    pass
+            _browser = _make_browser(keep_alive=True)
 
-    # Learn from this run
     steps = _step_logs.get(task_id, [])
     learn_from_run(task, steps, result, success=bool(result and len(result) > 80))
-
     return result
 
 
