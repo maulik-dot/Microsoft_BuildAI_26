@@ -1,45 +1,40 @@
 from backend.tools.browser import run_parallel_tasks
+from backend.tools.planner import plan_task
 from backend.models.schemas import PriceMonitorRequest
-from backend.memory.agent_memory import get_context, update
+from backend.memory.agent_memory import update
 
-DEEP_PROMPT = """You are a thorough price research agent. Find the best price for a product on {url}.
+TASK_TEMPLATE = """Check the price of "{product}" on {url}. Target: ₹{target}.
 
-PRODUCT: {product}
-TARGET PRICE: ₹{target}
-
-INSTRUCTIONS:
-
+SEARCH INSTRUCTIONS:
 1. Go to https://{url}
-2. Search for "{product}" in the search bar
-3. On the results page:
-   - Look for EXACT product match (not accessories, cases, or similar items)
-   - Check multiple listings — there may be different sellers/variants
-   - SCROLL down to see all variants (storage, color, etc.)
-4. Click on the main product listing
-5. On the product detail page extract:
-   - Exact current price
-   - Original MRP / strikethrough price
-   - Discount percentage
-   - Any active coupon codes or bank offers visible on page
-   - EMI options (lowest EMI)
-   - Seller name and seller rating
-   - Delivery date and cost
-   - Stock availability
+2. Search for "{product}" — find the EXACT product, not accessories
+3. On the product page extract:
+   - Current price (exact)
+   - Original MRP + discount %
+   - All active offers (bank cashback, coupon codes — read the "Offers" section fully)
+   - EMI options (lowest monthly)
+   - Seller name + seller rating
+   - Delivery date + cost
+   - Stock status
    - Product URL
-6. Check if there are other sellers for the same product (look for "Other sellers" or "Sold by")
-   - Extract prices from top 3 sellers
-7. Look for any "Price drop alert" or "Notify me" feature
-8. Is the current price at or below ₹{target}? Answer YES or NO clearly.
+4. Check "Other Sellers" section — list top 3 with prices
+5. Check if any variant (color/storage) is cheaper
+6. Is current price ≤ ₹{target}? State TARGET MET: YES or NO
 
-FORMAT your response as:
-PRODUCT: [exact name + specs]
+HANDLE OBSTACLES:
+- If login popup appears, close it and continue
+- If price is behind login, try scrolling — it usually shows anyway
+- Check multiple sellers for the same listing
+
+FORMAT:
+PRODUCT: [exact name + variant]
 CURRENT PRICE: ₹X (was ₹Y, save Z%)
-BEST SELLER: [name] | Rating: X
-ACTIVE OFFERS: [coupon/bank offer details]
-OTHER SELLERS: seller1 ₹X | seller2 ₹X
-DELIVERY: [date] [cost]
-TARGET MET: YES/NO
-RECOMMENDATION: [Buy now / Wait for sale / Check other platforms]
+ACTIVE OFFERS: [list all offers found]
+OTHER SELLERS: [seller] ₹X | [seller] ₹X
+DELIVERY: [date] | [cost]
+EMI: ₹X/month (Xm)
+TARGET MET: YES / NO
+RECOMMENDATION: Buy now / Wait / Check other platform
 URL: [link]"""
 
 
@@ -47,35 +42,27 @@ async def check_price(request: PriceMonitorRequest, step_callback=None) -> dict:
     platforms = request.platforms or ["flipkart", "amazon"]
     platform_urls = {"amazon": "amazon.in", "flipkart": "flipkart.com"}
 
-    memory_ctx = get_context("price_monitor")
-
     tasks = []
     for p in platforms:
         url = platform_urls.get(p, p)
-        prompt = memory_ctx + "\n\n" + DEEP_PROMPT.format(
+        plan = plan_task(
+            f"Find current price of {request.product_name} on {url}, target ₹{int(request.target_price)}",
+            "price_monitor"
+        )
+        task = plan + TASK_TEMPLATE.format(
             url=url,
             product=request.product_name,
             target=int(request.target_price),
         )
-        tasks.append(prompt)
+        tasks.append(task)
 
-    results = await run_parallel_tasks(tasks, max_steps=20)
+    results = await run_parallel_tasks(tasks, task_type="price_monitor", max_steps=20)
 
-    sections = []
-    for i, r in enumerate(results):
-        if r:
-            sections.append(f"## {platforms[i].upper()}\n\n{r}")
-
+    sections = [f"## {platforms[i].upper()}\n\n{r}" for i, r in enumerate(results) if r]
     combined = "\n\n---\n\n".join(sections)
 
-    # Add verdict
-    target_met = "YES" in combined.upper() and "TARGET MET: YES" in combined.upper()
-    verdict = f"\n\n## VERDICT\n{'✅ TARGET PRICE MET — Good time to buy!' if target_met else '⏳ Target price not yet reached — monitoring continues.'}"
-    combined += verdict
+    target_met = "TARGET MET: YES" in combined.upper()
+    combined += f"\n\n## VERDICT\n{'✅ Target price met — good time to buy!' if target_met else '⏳ Target not reached yet — monitoring continues.'}"
 
     update("price_monitor", combined, success=bool(combined))
-    return {
-        "product": request.product_name,
-        "target_price": request.target_price,
-        "summary": combined,
-    }
+    return {"product": request.product_name, "target_price": request.target_price, "summary": combined}

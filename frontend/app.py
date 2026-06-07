@@ -1,7 +1,6 @@
 import chainlit as cl
 import httpx
 import asyncio
-import json
 import os
 from dotenv import load_dotenv
 
@@ -9,38 +8,42 @@ load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), "..", ".env"))
 
 API_BASE = "http://localhost:8000"
 
-WELCOME = """**Agentic Web** — Your autonomous web agent
+WELCOME = """**Agentic Web** — Ask me anything. I'll research it on the web for you.
 
-I can handle:
-- **Travel** → *"Find flights from Mumbai to Delhi, June 10-12, under ₹8000"*
-- **Jobs** → *"Find Python developer jobs on LinkedIn and Naukri"*
-- **Price Monitor** → *"Alert me when iPhone 15 drops below ₹60,000 on Flipkart"*
-- **Hackathons** → *"Find hackathons for a BTech CSE engineer skilled in Python and ML"*
+Examples:
+- *"Find flights from Mumbai to Delhi on June 15 under ₹8000"*
+- *"Best Python developer jobs in Mumbai right now"*
+- *"Is Samsung Galaxy S24 available under ₹55,000?"*
+- *"Find hackathons for a BTech CSE engineer good at Python and ML"*
+- *"What are the top AI startups in India in 2025?"*
+- *"Find a Django course under ₹999 on Udemy and a free YouTube playlist"*
 
-You can also **upload your resume** and I'll auto-fill your profile for job and hackathon searches.
-
-What would you like me to do?"""
+Just type anything — I'll figure out where to search."""
 
 
 @cl.on_chat_start
 async def start():
-    cl.user_session.set("resume_profile", None)
+    cl.user_session.set("resume_text", None)
     await cl.Message(content=WELCOME).send()
 
 
 @cl.on_message
 async def handle_message(message: cl.Message):
-    # Handle resume file uploads
     if message.elements:
         for el in message.elements:
             if hasattr(el, "path") and el.path.endswith(".pdf"):
-                await handle_resume_upload(el.path)
+                await handle_resume_upload(el.path, message.content)
                 return
 
-    await route_message(message.content)
+    query = message.content.strip()
+    resume = cl.user_session.get("resume_text")
+    if resume and any(w in query.lower() for w in ["job", "hackathon", "opportunity", "apply"]):
+        query = f"{query}\n\nMy profile: {resume[:400]}"
+
+    await run_research(query)
 
 
-async def handle_resume_upload(path: str):
+async def handle_resume_upload(path: str, message: str):
     msg = cl.Message(content="Parsing your resume...")
     await msg.send()
     try:
@@ -52,108 +55,39 @@ async def handle_resume_upload(path: str):
                 )
         data = resp.json()
         profile = data.get("profile", {})
-        cl.user_session.set("resume_profile", data.get("resume_text", ""))
+        cl.user_session.set("resume_text", data.get("resume_text", ""))
         skills = ", ".join(profile.get("skills", [])[:6])
-        msg.content = f"Resume parsed!\n\n**Name:** {profile.get('name', 'N/A')}\n**Skills:** {skills}\n**Experience:** {profile.get('experience_years', 'N/A')} years\n\nYour profile is saved. Ask me to find jobs or hackathons and I'll use it automatically."
+        msg.content = (
+            f"Resume saved!\n\n**{profile.get('name', 'You')}** | {profile.get('current_role', 'N/A')}\n"
+            f"**Skills:** {skills} | **Experience:** {profile.get('experience_years', 'N/A')} years\n\n"
+            f"Now ask me anything — I'll use your profile for job/hackathon searches."
+        )
         await msg.update()
+        if message.strip():
+            await run_research(f"{message}\n\nMy profile: {data.get('resume_text','')[:400]}")
     except Exception as e:
-        msg.content = f"Failed to parse resume: {e}"
+        msg.content = f"Resume parse failed: {e}"
         await msg.update()
 
 
-async def route_message(text: str):
-    """Use Gemini to parse intent and extract params from natural language."""
-    msg = cl.Message(content="Thinking...")
+async def run_research(query: str):
+    msg = cl.Message(content="🔍 Analysing your query...")
     await msg.send()
 
-    # Parse intent with Gemini
     try:
-        intent_data = await parse_intent(text)
-    except Exception as e:
-        msg.content = f"⚠️ {e}"
-        await msg.update()
-        return
-
-    if not intent_data or not intent_data.get("intent"):
-        msg.content = "I can help with **travel**, **jobs**, **price monitoring**, or **hackathon discovery**. Could you be more specific?"
-        await msg.update()
-        return
-
-    intent = intent_data.get("intent")
-    params = intent_data.get("params", {})
-
-    # Inject saved resume if available
-    resume_text = cl.user_session.get("resume_profile")
-    if resume_text and intent in ("jobs", "hackathon"):
-        params["resume_text"] = resume_text
-
-    endpoint_map = {
-        "travel": "/tasks/travel",
-        "jobs": "/tasks/jobs",
-        "price_monitor": "/tasks/price-monitor",
-        "hackathon": "/tasks/hackathon",
-    }
-
-    endpoint = endpoint_map.get(intent)
-    if not endpoint:
-        msg.content = "I can help with travel, jobs, price monitoring, or hackathon discovery."
-        await msg.update()
-        return
-
-    # Start task
-    try:
-        async with httpx.AsyncClient(timeout=10) as client:
-            resp = await client.post(f"{API_BASE}{endpoint}", json=params)
+        async with httpx.AsyncClient(timeout=15) as client:
+            resp = await client.post(f"{API_BASE}/tasks/research", json={"query": query})
             task = resp.json()
     except Exception as e:
-        msg.content = f"Failed to start task: {e}"
+        msg.content = f"❌ Failed to start: {e}"
         await msg.update()
         return
 
     task_id = task["task_id"]
-    icon = {"travel": "✈️", "jobs": "💼", "price_monitor": "🔔", "hackathon": "🏆"}.get(intent, "🤖")
-    msg.content = f"{icon} Agent started — browsing the web for you..."
-    await msg.update()
-
-    # Poll and stream updates
-    await poll_task(task_id, msg, icon)
+    await poll_task(task_id, msg)
 
 
-async def parse_intent(user_text: str) -> dict | None:
-    """Use Gemini to extract structured intent from natural language."""
-    from google import genai as google_genai
-    client = google_genai.Client(api_key=os.environ.get("GOOGLE_API_KEY", ""))
-
-    prompt = f"""Extract the intent and parameters from this message. Return ONLY valid JSON.
-
-Message: "{user_text}"
-
-Possible intents:
-- "travel": needs from_city, to_city, departure_date (YYYY-MM-DD), optional return_date, budget (number in INR)
-- "jobs": needs job_titles (list), optional location, platforms (list from: linkedin, naukri, indeed)
-- "price_monitor": needs product_name, target_price (number in INR), optional platforms (list from: amazon, flipkart), auto_buy (boolean, default false)
-- "hackathon": needs resume_text (use "not provided" if unknown), optional skills (list), background (e.g. "BTech CSE"), platforms (list from: devfolio, unstop, hackerearth, default all three)
-
-Return format:
-{{"intent": "...", "params": {{...}}}}
-
-If message doesn't match any intent, return: {{"intent": null, "params": {{}}}}"""
-
-    try:
-        response = client.models.generate_content(model="gemini-3.1-flash-lite", contents=prompt)
-        raw = response.text.strip()
-        if raw.startswith("```"):
-            raw = raw.split("```")[1]
-            if raw.startswith("json"):
-                raw = raw[4:]
-        return json.loads(raw.strip())
-    except Exception as e:
-        # Surface the real error so it shows in the UI
-        raise RuntimeError(f"Intent parsing failed: {e}") from e
-
-
-async def poll_task(task_id: str, msg: cl.Message, icon: str):
-    """Poll task status and update message as it progresses."""
+async def poll_task(task_id: str, msg: cl.Message):
     dots = 0
     async with httpx.AsyncClient(timeout=10) as client:
         while True:
@@ -161,24 +95,76 @@ async def poll_task(task_id: str, msg: cl.Message, icon: str):
                 resp = await client.get(f"{API_BASE}/tasks/{task_id}")
                 task = resp.json()
             except Exception:
-                await asyncio.sleep(3)
+                await asyncio.sleep(2)
                 continue
 
             status = task["status"]
 
-            if status == "completed":
-                result = task.get("result", {})
-                summary = result.get("summary") or result.get("result") or str(result)
-                msg.content = f"{icon} **Done!**\n\n{summary}"
+            if status == "waiting_user":
+                # ── Clarifying question flow ──────────────────────────────
+                question = task.get("clarifying_question", "Could you clarify your request?")
+                msg.content = f"❓ **I need one clarification before I start:**\n\n{question}"
+                await msg.update()
+
+                answer = await cl.AskUserMessage(content=question, timeout=120).send()
+                if answer:
+                    # Submit clarification to backend
+                    try:
+                        async with httpx.AsyncClient(timeout=10) as c:
+                            await c.post(
+                                f"{API_BASE}/tasks/{task_id}/answer",
+                                json={"answer": answer["output"]},
+                            )
+                        msg.content = "🔍 Got it — researching now..."
+                        await msg.update()
+                    except Exception as e:
+                        msg.content = f"❌ Failed to submit answer: {e}"
+                        await msg.update()
+                        return
+                else:
+                    msg.content = "⏱️ No answer received — task cancelled."
+                    await msg.update()
+                    return
+
+            elif status == "completed":
+                result = task.get("result") or {}
+                answer_text = result.get("result") or "No result returned."
+                confidence = task.get("confidence") or result.get("confidence")
+                needs_review = task.get("needs_review") or result.get("needs_review", False)
+                gaps = result.get("gaps", [])
+
+                # Build confidence badge
+                conf_badge = _confidence_badge(confidence)
+
+                # Build review warning
+                review_warning = ""
+                if needs_review:
+                    review_warning = "\n\n⚠️ **Low confidence — recommend verifying manually.**"
+                    if gaps:
+                        review_warning += f"\n*Missing: {', '.join(gaps[:2])}*"
+
+                msg.content = f"🔍 **Research complete** {conf_badge}\n\n{answer_text}{review_warning}"
                 await msg.update()
                 break
+
             elif status == "failed":
-                error = task.get("error", "Unknown error")
-                msg.content = f"❌ **Failed:** {error}"
+                msg.content = f"❌ **Failed:** {task.get('error', 'Unknown error')}"
                 await msg.update()
                 break
+
             else:
                 dots = (dots % 3) + 1
-                msg.content = f"{icon} Agent working{'.' * dots}"
+                msg.content = f"🔍 Browsing the web{'.' * dots}"
                 await msg.update()
                 await asyncio.sleep(2)
+
+
+def _confidence_badge(confidence: int | None) -> str:
+    if confidence is None:
+        return ""
+    if confidence >= 80:
+        return f"✅ `{confidence}% confidence`"
+    elif confidence >= 60:
+        return f"🟡 `{confidence}% confidence`"
+    else:
+        return f"🔴 `{confidence}% confidence`"

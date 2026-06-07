@@ -5,6 +5,8 @@ class Settings(BaseSettings):
     anthropic_api_key: str
     anthropic_base_url: str = "https://api.anthropic.com"
     google_api_key: str = ""
+    groq_api_key: str = ""
+    openai_api_key: str = ""
     browser_use_api_key: str = ""
     app_env: str = "development"
     log_level: str = "INFO"
