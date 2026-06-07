@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="frontend/logo.png" alt="Vayu Logo" width="180"/>
+</p>
+
 # Vayu — Autonomous Web Research Agent
 
 > *"Vayu moves through the internet like wind — finding anything, anywhere, for you."*
