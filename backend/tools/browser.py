@@ -129,7 +129,7 @@ def _make_agent(task: str, browser: Browser, task_type: str = "",
         display_files_in_done_text=False,
 
         # ── System context: all 7 principles + learned memory + site knowledge ──
-        extend_system_message=get_system_context(task_type, temporal=temporal)
+        extend_system_message=get_system_context(task_type, temporal=temporal, task=task)
             + ("\n\n" + learned_ctx if learned_ctx else ""),
 
         # ── Step streaming ──

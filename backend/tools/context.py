@@ -130,6 +130,21 @@ If you cannot complete the full task:
 """
 
 
+# ── CONDITIONAL INSTRUCTION BLOCK ─────────────────────────────────────────
+
+CONDITIONAL_BLOCK = """
+## CONDITIONAL INSTRUCTIONS
+This task contains an if/else condition. Execute it yourself — do NOT ask the user.
+Steps:
+1. Find the data needed to evaluate the condition (e.g. check view count, price, rating)
+2. Evaluate: is the condition true or false?
+3. Execute the correct branch based on your finding
+4. Report what condition was met and what you did
+
+Example: "If video has >50k views → find channel playlist. If not → search GeeksforGeeks."
+→ You check views, decide which branch applies, then execute it. Never ask the user.
+"""
+
 # ── TEMPORAL CONTEXT ───────────────────────────────────────────────────────
 
 TEMPORAL_FILTER_BLOCK = """
@@ -203,7 +218,16 @@ After search results load: click Tools → Any time → Past year for recency fi
 
 # ── MAIN CONTEXT BUILDER ───────────────────────────────────────────────────
 
-def get_system_context(task_type: str = "", temporal: bool = False) -> str:
+def has_conditional(task: str) -> bool:
+    """Detect if a task contains if/else conditional logic."""
+    t = task.lower()
+    return any(phrase in t for phrase in [
+        "if the ", "if it has", "if there are", "if not,", "if not —",
+        "otherwise,", "otherwise —", "else,", "else —", "if no ",
+    ])
+
+
+def get_system_context(task_type: str = "", temporal: bool = False, task: str = "") -> str:
     """
     Build the complete system context for a task.
     Combines: agent principles + learned memory + site knowledge + temporal filter.
@@ -218,6 +242,10 @@ def get_system_context(task_type: str = "", temporal: bool = False) -> str:
     # Inject temporal filter when needed
     if temporal:
         parts.append(TEMPORAL_FILTER_BLOCK)
+
+    # Inject conditional handler when if/else logic detected
+    if task and has_conditional(task):
+        parts.append(CONDITIONAL_BLOCK)
 
     return "\n\n".join(parts)
 

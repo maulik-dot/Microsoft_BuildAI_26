@@ -27,14 +27,18 @@ Today's date: {today}
 Query: "{query}"
 
 Categories:
-- comparison: user wants prices, best deal, cheapest option, or to compare options across sources. Key signals: "price", "cheapest", "best deal", "under ₹X", "compare", "how much"
-- travel: user wants a full trip plan — needs BOTH flights AND hotels as an itinerary
-- jobs: user wants job listings, career opportunities, salary info
-- hackathon: user wants hackathons, coding competitions, tech events
-- research: general info, how-to, news, explanations, recommendations, trailers, anything else
+- comparison: user wants prices, deals, cheapest option across multiple stores. Key signals: "price", "cheapest", "compare prices", "under ₹X", "Flipkart vs Amazon"
+- travel: user wants flight + hotel itinerary with specific cities and dates
+- jobs: user wants job listings, salary info, career openings
+- hackathon: user specifically mentions hackathon, coding contest, devfolio, unstop
+- research: EVERYTHING ELSE — facts, stats, how-to, coding problems, YouTube, news, "how many", "what is", "find me", "solved", "acceptance rate", programming, general web research
 
-Note: "latest trailer", "new movie", "best restaurants" = research (not comparison)
-Note: "cheapest laptop", "best price for X" = comparison (has price intent)
+IMPORTANT rules to avoid misclassification:
+- "how many people solved it", "acceptance rate", "solved by" = research (NOT hackathon)
+- "find on YouTube", "most viewed video" = research
+- "DSA playlist", "study plan" = research
+- "if the video has X views" = research (conditional instruction)
+- Only use hackathon when user explicitly asks for hackathon events/competitions
 
 Return only: comparison | travel | jobs | hackathon | research"""
 
