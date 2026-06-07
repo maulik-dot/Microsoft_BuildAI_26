@@ -30,8 +30,9 @@ QUERY: "{query}"
 
 Rules:
 - is_ambiguous: true ONLY if the query is missing critical information (e.g. "find flights" with no cities). Vague words, conditional logic ("if X then Y else Z"), and pronouns referencing prior context are NOT ambiguous.
-- NEVER mark as ambiguous: conditional prompts like "If the video has more than 50k views, do X, otherwise do Y" — these are clear instructions, not ambiguous.
-- NEVER mark as ambiguous: follow-up pronouns like "it", "them", "the same" — they reference prior context.
+- NEVER mark as ambiguous: conditional prompts like "If the video has more than 50k views, do X, otherwise do Y" — these are clear instructions. The agent evaluates and executes the correct branch.
+- NEVER mark as ambiguous: follow-up pronouns like "it", "them", "the same", "the video" — they reference prior context.
+- NEVER mark as ambiguous when "the video" or "it" refers to something mentioned in a prior message, even if the result was "not found" — the agent handles that via the if/else branch.
 - clarifying_question: if is_ambiguous=true, write ONE short question. If false, set null.
 - success_condition: what a complete correct answer must contain.
 - refined_query: rewrite the query to be more precise. IMPORTANT:

@@ -19,13 +19,20 @@ from backend.tools.planner import _call_llm
 
 
 REFERENCE_WORDS = [
+    # Pronouns
     "their", "them", "those", "these", "its", "it",
+    # Specific item references
     "the book", "the books", "the first", "the second", "the third",
     "that one", "which one", "the job", "the jobs", "the product",
     "the course", "the flight", "the hotel", "the price", "the prices",
+    "the video", "the channel", "the playlist", "the problem",
+    "the result", "the link", "the page", "the site",
     "all of them", "any of them", "the last one", "the same",
+    # Follow-up signals
     "what about", "how about", "and also", "compare them",
     "cheaper", "better", "different", "free", "paid", "similar",
+    # Conditional signals — always send to LLM for branch resolution
+    "if the ", "if it ", "if there", "if not", "otherwise",
 ]
 
 
@@ -60,31 +67,30 @@ def resolve_query(query: str, context: list[dict]) -> str:
 
     conv_text = "\n".join(conv_lines)
 
-    prompt = f"""You are resolving a follow-up question in a conversation. The user may reference things from previous messages using pronouns or vague terms.
+    prompt = f"""You are resolving a follow-up question in a conversation.
 
 CONVERSATION HISTORY:
 {conv_text}
 
 NEW MESSAGE FROM USER: "{query}"
 
-Your task:
-1. Identify what specific items/entities the user is referring to (books, jobs, products, prices, etc.)
-2. Extract their EXACT names/titles from the conversation history
-3. Rewrite the user's message as a fully standalone question that explicitly names those items
+Decision rules (apply strictly in order):
 
-Rules:
-- If the previous agent response listed specific items (books, jobs, prices, products), NAME THEM in the resolved query
-- Do not be vague — "their prices" must become "prices of [exact item names]"
-- Keep the user's original intent intact
-- If the query is already standalone and specific, return it unchanged
-- Return ONLY the resolved question, nothing else
+1. CONDITIONAL IF/ELSE: If the message says "If [condition], do X. If not, do Y":
+   - Check the conversation history to evaluate whether the condition is true or false
+   - If the condition IS met → rewrite as just "do X" (with specific context filled in)
+   - If the condition is NOT met (or the referenced thing doesn't exist) → rewrite as just "do Y" (with specific context)
+   - Example: "If the video has >50k views, find playlist. If not, search GeeksforGeeks."
+     → If history shows no video was found → resolve to "Search GeeksforGeeks for [topic from context]"
+     → If history shows video with 100k views → resolve to "Find the most popular DSA playlist on [channel name]"
 
-Examples of good resolution:
-- "what are their prices?" after listing 3 books → "What are the current prices of [Book 1], [Book 2], and [Book 3] on Amazon or Flipkart?"
-- "which is cheaper?" after price comparison → "Between [Product A at ₹X] and [Product B at ₹Y], which is the cheaper option?"
-- "find me Python jobs in Mumbai" (standalone) → "find me Python jobs in Mumbai" (unchanged)
+2. NEW TOPIC: If the message introduces a completely different subject/domain, return UNCHANGED.
 
-Resolved question:"""
+3. FOLLOW-UP WITH PRONOUNS: If "their", "it", "the same", "which one" directly refers to items from previous message, name those items explicitly.
+
+4. STANDALONE: If already specific and standalone, return UNCHANGED.
+
+Return ONLY the final resolved question. No explanation."""
 
     resolved = _call_llm(prompt, task_type="planning")
     if not resolved or len(resolved.strip()) < 3:
