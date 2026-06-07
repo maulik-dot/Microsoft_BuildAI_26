@@ -1136,7 +1136,8 @@ main {
 </div>
 
 <script>
-const API = 'http://localhost:8000';
+// Use relative URLs so it works on any deployment (Railway, Render, localhost)
+const API = window.location.origin === 'null' ? 'http://localhost:8000' : '';
 marked.setOptions({ gfm: true, breaks: true });
 
 let busy = false, resumeProfile = null, clarifyTaskId = null;
