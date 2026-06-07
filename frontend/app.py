@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), "..", ".env"))
 
-API_BASE = os.environ.get("BACKEND_URL", "http://localhost:8000")
+API_BASE = os.environ.get("BACKEND_URL", f"http://localhost:{os.environ.get('PORT', '8000')}")
 
 WELCOME = """**Agentic Web** — Ask me anything. I'll research it on the web for you.
 
