@@ -545,6 +545,22 @@ main {
   font-style: italic;
 }
 
+/* Product / item images */
+.bubble img {
+  max-width: 200px; max-height: 200px;
+  object-fit: contain; border-radius: 10px;
+  border: 1px solid var(--border2);
+  background: var(--bg2); padding: 8px;
+  display: block; margin: 10px 0 6px;
+  transition: transform 0.2s, box-shadow 0.2s;
+  cursor: zoom-in;
+}
+
+.bubble img:hover {
+  transform: scale(1.05);
+  box-shadow: 0 0 24px rgba(0,200,255,0.25), 0 0 8px rgba(255,61,161,0.15);
+}
+
 .bubble hr {
   border: none; border-top: 1px solid var(--border);
   margin: 14px 0;

@@ -109,6 +109,20 @@ Structure your final answer:
 3. Source URL for every major data point
 4. Key Takeaway or recommendation at the end
 
+## PRODUCT & ITEM IMAGES — IMPORTANT
+When the task involves products, items, books, courses, or any visual objects:
+- Find and include the main product image URL from the page
+- Embed it in your result using markdown: ![Product Name](image_url)
+- Place the image just before or after the product details
+- For multiple products, include an image for each one if available
+- Use the actual product image from the retailer page (not thumbnails/ads)
+- If no image found on the page, skip — do not use placeholder images
+
+Example format for a product result:
+![Samsung Galaxy S24](https://image-url-from-flipkart.com/product.jpg)
+**Samsung Galaxy S24** | ₹54,990 | Rating: 4.5/5
+[Buy on Flipkart](https://flipkart.com/...)
+
 If you cannot complete the full task:
 - Report what you DID successfully find
 - Explain clearly what failed and why
