@@ -184,11 +184,12 @@ def _extract_best_result(agent_history) -> str:
 
     def is_action_log(text: str) -> bool:
         t = text.strip()
-        return any(t.startswith(p) for p in ACTION_PREFIXES) or len(t) < 60
+        # Only filter pure action log lines, not short but valid answers
+        return any(t.startswith(p) for p in ACTION_PREFIXES)
 
     # 1. Try official final result — strip attachments first
     final = _strip_attachments(agent_history.final_result() or "")
-    if final and len(final.strip()) > 80 and not is_action_log(final):
+    if final and len(final.strip()) > 20 and not is_action_log(final):
         return final
 
     # 2. Try extracted_content — filter action logs and attachments
@@ -197,7 +198,7 @@ def _extract_best_result(agent_history) -> str:
         if extracted:
             lines = [l for l in extracted.split('\n') if l.strip() and not is_action_log(l)]
             clean = "\n".join(lines).strip()
-            if len(clean) > 80:
+            if len(clean) > 20:
                 return clean
     except Exception:
         pass
@@ -207,7 +208,7 @@ def _extract_best_result(agent_history) -> str:
         collected = []
         for r in agent_history.action_results():
             content = _strip_attachments(str(getattr(r, "extracted_content", "") or "").strip())
-            if content and len(content) > 80 and not is_action_log(content):
+            if content and len(content) > 20 and not is_action_log(content):
                 collected.append(content)
         if collected:
             return "\n\n".join(collected)
@@ -226,7 +227,7 @@ async def run_browser_task(task: str, task_type: str = "", task_id: str = "",
     history = await agent.run(max_steps=max_steps)
     result = _extract_best_result(history)
     steps = _step_logs.get(task_id, [])
-    learn_from_run(task, steps, result, success=bool(result and len(result) > 80))
+    learn_from_run(task, steps, result, success=bool(result and len(result) > 20))
     return result
 
 
@@ -262,7 +263,7 @@ async def run_deep_task(task: str, task_type: str = "", task_id: str = "",
             _browser = _make_browser(keep_alive=True)
 
     steps = _step_logs.get(task_id, [])
-    learn_from_run(task, steps, result, success=bool(result and len(result) > 80))
+    learn_from_run(task, steps, result, success=bool(result and len(result) > 20))
     return result
 
 

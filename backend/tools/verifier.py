@@ -21,7 +21,7 @@ def verify(query: str, result: str, success_condition: str) -> dict:
         needs_human_review: bool
         retry_hint: str
     """
-    if not result or len(result.strip()) < 50:
+    if not result or len(result.strip()) < 15:
         return {
             "passed": False,
             "confidence": 0,
