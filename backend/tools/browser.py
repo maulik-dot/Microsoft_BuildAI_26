@@ -1,4 +1,5 @@
 import asyncio
+import os
 from browser_use import Agent, Browser, BrowserProfile
 from browser_use.llm.google.chat import ChatGoogle
 from backend.config import settings
