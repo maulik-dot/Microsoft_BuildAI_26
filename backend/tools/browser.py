@@ -20,9 +20,10 @@ def get_llm():
 
 
 def _make_browser(keep_alive: bool = True) -> Browser:
+    headless = os.environ.get("HEADLESS", "false").lower() == "true"
     return Browser(
         browser_profile=BrowserProfile(
-            headless=False,
+            headless=headless,
             disable_security=True,
             keep_alive=keep_alive,
             minimum_wait_page_load_time=0.5,
