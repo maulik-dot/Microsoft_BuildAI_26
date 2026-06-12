@@ -15,7 +15,7 @@ from backend.tools.planner import _call_llm
 
 
 def classify(query: str) -> str:
-    """Classify the query into either comparison or research."""
+    """Classify the query into either comparison, research, or chit_chat."""
     from datetime import datetime
     today = datetime.now().strftime("%B %d, %Y")
 
@@ -26,20 +26,39 @@ Query: "{query}"
 
 Categories:
 - comparison: user wants a direct price comparison, deals, cheapest option across multiple stores, or comparing specific options/products. Key signals: "compare", "cheapest", "vs", "under ₹X", "best deal".
+- chit_chat: casual messages, greetings, pleasantries, compliments, thanks, or simple conversational replies that do not require any web search. Key signals: "hi", "hello", "hey", "thanks", "thank you", "arigato", "good job", "great", "nice", "bye".
 - research: EVERYTHING ELSE — general questions, finding information, lists of jobs, flights, hotel details, hackathons, facts, specs, tutorials, YouTube search, programming queries.
 
-Return only: comparison | research"""
+Return only: comparison | research | chit_chat"""
 
     result = _call_llm(prompt, task_type="planning")
     result = result.strip().lower().split()[0] if result else "research"
-    valid = {"comparison", "research"}
+    valid = {"comparison", "research", "chit_chat"}
     return result if result in valid else "research"
 
 
 async def route(query: str, task_id: str = "") -> dict:
     task_type = classify(query)
 
-    if task_type == "comparison":
+    if task_type == "chit_chat":
+        # Reply directly without browser
+        reply = _call_llm(f"""You are Vayu, a friendly and helpful autonomous web research agent. 
+Reply politely and concisely to the user's message. Stay in character.
+
+USER MESSAGE: "{query}"
+
+Return only your direct reply.""", task_type="planning")
+        return {
+            "query": query,
+            "result": reply,
+            "task_type": "chit_chat",
+            "confidence": 100,
+            "needs_review": False,
+            "gaps": [],
+            "status": "completed"
+        }
+
+    elif task_type == "comparison":
         from backend.agents.comparison.crew import run_comparison
         return await run_comparison(query, task_id=task_id)
     else:
