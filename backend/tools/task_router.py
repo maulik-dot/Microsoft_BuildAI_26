@@ -14,19 +14,27 @@ import json
 from backend.tools.planner import _call_llm
 
 
-def classify(query: str) -> str:
+def classify(query: str, context: list = None) -> str:
     """Classify the query into either comparison, research, or chit_chat."""
     from datetime import datetime
     today = datetime.now().strftime("%B %d, %Y")
 
-    prompt = f"""Classify this query into exactly one category. Return ONLY the category name.
+    history_str = ""
+    if context:
+        history_str = "CONVERSATION HISTORY:\n" + "\n".join(
+            f"{'User' if m.get('role') == 'user' else 'Vayu'}: {m.get('content', '')}"
+            for m in context[-6:]
+        ) + "\n\n"
+
+    prompt = f"""Classify this user query into exactly one category. Return ONLY the category name.
 
 Today's date: {today}
-Query: "{query}"
+
+{history_str}User Query: "{query}"
 
 Categories:
 - comparison: user wants a direct price comparison, deals, cheapest option across multiple stores, or comparing specific options/products. Key signals: "compare", "cheapest", "vs", "under ₹X", "best deal".
-- chit_chat: casual messages, greetings, pleasantries, compliments, thanks, or simple conversational replies that do not require any web search. Key signals: "hi", "hello", "hey", "thanks", "thank you", "arigato", "good job", "great", "nice", "bye".
+- chit_chat: casual messages, greetings, pleasantries, compliments, thanks, simple conversational replies, personal questions (like name, identity, feelings), or chat that does not require web search. Key signals: "hi", "hello", "hey", "thanks", "thank you", "arigato", "good job", "great", "nice", "bye", "what is my name", "who are you".
 - research: EVERYTHING ELSE — general questions, finding information, lists of jobs, flights, hotel details, hackathons, facts, specs, tutorials, YouTube search, programming queries.
 
 Return only: comparison | research | chit_chat"""
@@ -37,14 +45,24 @@ Return only: comparison | research | chit_chat"""
     return result if result in valid else "research"
 
 
-async def route(query: str, task_id: str = "") -> dict:
-    task_type = classify(query)
+async def route(query: str, task_id: str = "", context: list = None) -> dict:
+    task_type = classify(query, context=context)
 
     if task_type == "chit_chat":
+        # Format recent conversation history
+        history_str = ""
+        if context:
+            history_str = "\n".join(
+                f"{'User' if m.get('role') == 'user' else 'Vayu'}: {m.get('content', '')}"
+                for m in context[-6:]
+            ) + "\n"
+
         # Reply directly without browser
         reply = _call_llm(f"""You are Vayu, a friendly and helpful autonomous web research agent. 
-Reply politely and concisely to the user's message. Stay in character.
+Reply politely and concisely to the user's message, keeping the conversation history in mind. Stay in character.
 
+CONVERSATION HISTORY:
+{history_str}
 USER MESSAGE: "{query}"
 
 Return only your direct reply.""", task_type="planning")

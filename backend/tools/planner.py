@@ -15,7 +15,8 @@ def _call_llm(prompt: str, task_type: str = "planning") -> str:
         client = genai.Client(api_key=settings.google_api_key)
         r = client.models.generate_content(model=model, contents=prompt)
         return r.text.strip()
-    except Exception:
+    except Exception as e:
+        print(f"[LLM ERROR] {e}")
         return ""
 
 

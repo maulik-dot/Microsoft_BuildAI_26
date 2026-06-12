@@ -66,11 +66,11 @@ async def start_research(request: ResearchRequest, background_tasks: BackgroundT
                     None, resolve_query, request.query, request.context
                 ),
                 asyncio.get_event_loop().run_in_executor(
-                    None, classify, request.query
+                    None, classify, request.query, request.context
                 ),
             )
 
-            result = await route(resolved_query, task_id=task_id)
+            result = await route(resolved_query, task_id=task_id, context=request.context)
             if result.get("status") == "waiting_user":
                 _update(task_id,
                     status="waiting_user",
