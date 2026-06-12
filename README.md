@@ -20,15 +20,13 @@ Existing solutions either hallucinate (LLMs without browser access) or are hardc
 
 ## Solution Overview
 
-Vayu is a **FastAPI + browser-use + Gemini** system with five specialized agent crews dispatched by an LLM-based intent router:
+Vayu is a **FastAPI + browser-use + Gemini** system. An LLM-based intent router dynamically classifies tasks into either general research or comparison categories, routing them to the corresponding agent:
 
 | Query Type | Example | Agent |
 |---|---|---|
-| General Research | "Top AI startups in India 2025" | Research Agent (full pipeline) |
-| Price Comparison | "Samsung S24 under ₹55,000?" | Comparison Agent (Google-first discovery) |
-| Travel | "Flights Mumbai → Delhi June 15" | Travel Crew (ixigo.com) |
-| Jobs | "Python ML jobs in Bangalore" | Jobs Crew (parallel multi-platform) |
-| Hackathons | "Find hackathons for ML engineers" | Hackathon Crew + cron monitor |
+| General Research | "Top AI startups in India 2025" | Research Agent (10-capability pipeline) |
+| Price/Option Comparison | "Samsung S24 vs iPhone 15 prices?" | Comparison Agent (Google-first discovery & comparison table) |
+| Travel, Jobs, & Hackathons | "Flights Mumbai → Delhi on June 15", "Python jobs in Bangalore" | Handled generalized via dynamic context memory injection |
 
 ---
 
@@ -41,13 +39,13 @@ User Query (Chainlit UI)
   FastAPI Backend (/api/tasks)
         │
         ▼
-  Task Router (LLM classify → comparison | travel | jobs | hackathon | research)
+  Task Router (LLM classify → comparison | research)
         │
    ┌────┴──────────────────────────────────────┐
    │                                           │
    ▼                                           ▼
-Research Agent (10-capability pipeline)    Specialized Crews
-   │                                       (Travel / Jobs / Hackathon / Comparison)
+Research Agent (10-capability pipeline)    Comparison Agent
+   │                                       (Multi-source Google Discovery)
    ├─ 1. Goal Interpreter (ambiguity check)
    ├─ 2. Memory Retrieval (3-tier memory)
    ├─ 3. Query Engineer (Google operators)
@@ -61,7 +59,7 @@ Research Agent (10-capability pipeline)    Specialized Crews
    └─ 7. Retry Loop (max 2) + Memory Update + Learner
 
   3-Tier Memory System
-   ├─ agent_memory.json  — per-domain: works/blocked/tips
+   ├─ agent_memory.json  — per-domain: works/blocked/tips (travel/jobs/hackathons)
    ├─ general_memory.json — cross-query: top sources, patterns
    └─ web_knowledge.json — site perf, navigation hints, obstacles
 
@@ -70,8 +68,7 @@ Research Agent (10-capability pipeline)    Specialized Crews
    └─ LARGE (gemini-2.5-flash → fallback chain): browser agent, reasoning
 
   Background Monitoring (APScheduler)
-   ├─ Price Monitor — every 30 min
-   └─ Hackathon Monitor — every 6 hours
+   └─ Price Monitor — every 30 min
 ```
 
 ---
@@ -183,9 +180,6 @@ vayu/
 │   ├── agents/
 │   │   ├── research/agent.py  # 10-capability research pipeline
 │   │   ├── comparison/crew.py # Self-learning price comparison
-│   │   ├── travel/crew.py     # ixigo flights + hotels
-│   │   ├── jobs/crew.py       # Parallel multi-platform job search
-│   │   ├── hackathon/crew.py  # Devfolio + Unstop scraper
 │   │   └── price_monitor/     # Scheduled price alerts
 │   ├── tools/
 │   │   ├── browser.py         # browser-use wrapper, step streaming
@@ -201,7 +195,7 @@ vayu/
 │   ├── memory/
 │   │   └── agent_memory.py    # 3-tier persistent memory system
 │   ├── monitoring/
-│   │   └── scheduler.py       # APScheduler for price/hackathon monitors
+│   │   └── scheduler.py       # APScheduler for price monitors
 │   ├── api/
 │   │   └── tasks.py           # REST endpoints (create/poll/stream tasks)
 │   └── models/
