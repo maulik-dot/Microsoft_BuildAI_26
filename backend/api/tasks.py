@@ -144,47 +144,7 @@ async def answer_clarification(task_id: str, request: AnswerRequest, background_
     return task_store[task_id]
 
 
-# --- Legacy specialized endpoints (kept for direct API use) ---
-
-@router.post("/travel")
-async def start_travel(request: dict, background_tasks: BackgroundTasks):
-    from backend.agents.travel.crew import run_travel_booking
-    from backend.models.schemas import TravelRequest
-
-    task_id = str(uuid.uuid4())
-    task_store[task_id] = {"task_id": task_id, "status": "pending", "result": None, "error": None}
-
-    async def run():
-        _update(task_id, status="running")
-        try:
-            result = await run_travel_booking(TravelRequest(**request))
-            _update(task_id, status="completed", result=result)
-        except Exception as e:
-            _update(task_id, status="failed", error=str(e))
-
-    background_tasks.add_task(run)
-    return task_store[task_id]
-
-
-@router.post("/jobs")
-async def start_jobs(request: dict, background_tasks: BackgroundTasks):
-    from backend.agents.jobs.crew import run_job_applications
-    from backend.models.schemas import JobRequest
-
-    task_id = str(uuid.uuid4())
-    task_store[task_id] = {"task_id": task_id, "status": "pending", "result": None, "error": None}
-
-    async def run():
-        _update(task_id, status="running")
-        try:
-            result = await run_job_applications(JobRequest(**request))
-            _update(task_id, status="completed", result=result)
-        except Exception as e:
-            _update(task_id, status="failed", error=str(e))
-
-    background_tasks.add_task(run)
-    return task_store[task_id]
-
+# --- Price Monitor endpoint (kept for direct API use) ---
 
 @router.post("/price-monitor")
 async def start_price_monitor(request: dict, background_tasks: BackgroundTasks):
@@ -205,25 +165,6 @@ async def start_price_monitor(request: dict, background_tasks: BackgroundTasks):
     background_tasks.add_task(run)
     return task_store[task_id]
 
-
-@router.post("/hackathon")
-async def start_hackathon(request: dict, background_tasks: BackgroundTasks):
-    from backend.agents.hackathon.crew import find_hackathons
-    from backend.models.schemas import HackathonRequest
-
-    task_id = str(uuid.uuid4())
-    task_store[task_id] = {"task_id": task_id, "status": "pending", "result": None, "error": None}
-
-    async def run():
-        _update(task_id, status="running")
-        try:
-            result = await find_hackathons(HackathonRequest(**request))
-            _update(task_id, status="completed", result=result)
-        except Exception as e:
-            _update(task_id, status="failed", error=str(e))
-
-    background_tasks.add_task(run)
-    return task_store[task_id]
 
 
 # --- Memory + status endpoints ---

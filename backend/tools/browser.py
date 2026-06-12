@@ -219,24 +219,26 @@ def _extract_best_result(agent_history) -> str:
 
 
 async def run_browser_task(task: str, task_type: str = "", task_id: str = "",
-                           temporal: bool = False, max_steps: int = 25) -> str:
+                           temporal: bool = False, max_steps: int = 25,
+                           original_query: str = "") -> str:
     from backend.tools.learner import get_learned_context, learn_from_run
-    learned_ctx = get_learned_context(task)
+    learned_ctx = get_learned_context(original_query or task)
     browser = await get_browser()
     agent = _make_agent(task, browser, task_type, task_id, temporal, learned_ctx)
     history = await agent.run(max_steps=max_steps)
     result = _extract_best_result(history)
     steps = _step_logs.get(task_id, [])
-    learn_from_run(task, steps, result, success=bool(result and len(result) > 20))
+    learn_from_run(original_query or task, steps, result, success=bool(result and len(result) > 20))
     return result
 
 
 async def run_deep_task(task: str, task_type: str = "", task_id: str = "",
-                        temporal: bool = False, max_steps: int = 35) -> str:
+                        temporal: bool = False, max_steps: int = 35,
+                        original_query: str = "") -> str:
     global _browser
     from backend.tools.learner import get_learned_context, learn_from_run
 
-    learned_ctx = get_learned_context(task)
+    learned_ctx = get_learned_context(original_query or task)
 
     # Always create a fresh browser for each task.
     # The warm browser's internal session gets reset after each run,
@@ -263,7 +265,7 @@ async def run_deep_task(task: str, task_type: str = "", task_id: str = "",
             _browser = _make_browser(keep_alive=True)
 
     steps = _step_logs.get(task_id, [])
-    learn_from_run(task, steps, result, success=bool(result and len(result) > 20))
+    learn_from_run(original_query or task, steps, result, success=bool(result and len(result) > 20))
     return result
 
 

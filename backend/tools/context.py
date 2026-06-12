@@ -249,7 +249,7 @@ def get_system_context(task_type: str = "", temporal: bool = False, task: str = 
     parts = [AGENT_SYSTEM_PROMPT, SITE_KNOWLEDGE]
 
     # Inject learned memory for this task type
-    memory_block = _build_memory_block(task_type)
+    memory_block = _build_memory_block(task_type, query=task)
     if memory_block:
         parts.append(memory_block)
 
@@ -264,24 +264,44 @@ def get_system_context(task_type: str = "", temporal: bool = False, task: str = 
     return "\n\n".join(parts)
 
 
-def _build_memory_block(task_type: str) -> str:
+def _build_memory_block(task_type: str, query: str = "") -> str:
     """Build a memory context block from what the agent has learned."""
     lines = []
 
-    # Task-specific memory
+    # Map query keywords to historical task types to retrieve specific learned context
+    detected_types = []
+    if query:
+        q = query.lower()
+        if any(w in q for w in ["flight", "hotel", "travel", "trip", "ixigo"]):
+            detected_types.append("travel")
+        if any(w in q for w in ["job", "career", "hiring", "vacancy", "naukri"]):
+            detected_types.append("jobs")
+        if any(w in q for w in ["hackathon", "devfolio", "unstop", "contest"]):
+            detected_types.append("hackathon")
+        if any(w in q for w in ["price", "flipkart", "amazon", "deal", "buy", "compare"]):
+            detected_types.append("price_monitor")
+
     if task_type and task_type not in ("research", ""):
-        memory = load_memory()
-        m = memory.get(task_type, {})
+        detected_types.append(task_type)
+
+    # Remove duplicates but keep order
+    seen = set()
+    detected_types = [x for x in detected_types if not (x in seen or seen.add(x))]
+
+    # Task-specific memory
+    memory = load_memory()
+    for dtype in detected_types:
+        m = memory.get(dtype, {})
         if m.get("works"):
-            lines.append(f"## LEARNED: Sites that work for {task_type}")
+            lines.append(f"## LEARNED: Sites that work for {dtype}")
             for s in m["works"][:4]:
                 lines.append(f"  ✅ {s}")
         if m.get("blocked"):
-            lines.append(f"## LEARNED: Sites to skip for {task_type}")
+            lines.append(f"## LEARNED: Sites to skip for {dtype}")
             for s in m["blocked"][:4]:
                 lines.append(f"  ❌ {s}")
         if m.get("tips"):
-            lines.append(f"## LEARNED: Tips for {task_type}")
+            lines.append(f"## LEARNED: Tips for {dtype}")
             for t in m["tips"][:3]:
                 lines.append(f"  💡 {t}")
 

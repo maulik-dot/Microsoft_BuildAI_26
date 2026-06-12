@@ -111,7 +111,7 @@ IMPORTANT RULES:
 - A site that loads slowly but eventually works is fine — a site that shows CAPTCHA/login wall is not
 - The goal is finding the BEST result, not just the first result"""
 
-    result = await run_deep_task(task, task_type="research", task_id=task_id, max_steps=35)
+    result = await run_deep_task(task, task_type="research", task_id=task_id, max_steps=35, original_query=query)
 
     # Learn from this run — extract which sites appeared in the result
     if result:

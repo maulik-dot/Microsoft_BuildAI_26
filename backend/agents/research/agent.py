@@ -76,7 +76,8 @@ async def run_research(query: str, task_id: str = "") -> dict:
         browser_model = get_model_for_tier(ModelTier.LARGE)
         t_start = time.time()
         result = await run_deep_task(task, task_type="research", task_id=task_id,
-                                      temporal=temporal_intent, max_steps=max_steps)
+                                      temporal=temporal_intent, max_steps=max_steps,
+                                      original_query=refined_query)
         latency_ms = int((time.time() - t_start) * 1000)
 
         # ── 5. VERIFICATION ───────────────────────────────────────────────

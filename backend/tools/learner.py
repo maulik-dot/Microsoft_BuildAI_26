@@ -23,6 +23,11 @@ from backend.tools.planner import _call_llm
 
 KNOWLEDGE_FILE = os.path.join(os.path.dirname(__file__), "../../../web_knowledge.json")
 
+IGNORED_DOMAINS = {
+    "google.com", "google.co.in", "google.co.uk", "google.ca", "google.com.au",
+    "bing.com", "duckduckgo.com", "yahoo.com", "search.yahoo.com", "baidu.com", "yandex.com"
+}
+
 
 # ── Knowledge Schema ──────────────────────────────────────────────────────────
 
@@ -45,6 +50,7 @@ def _load() -> dict:
 def _save(knowledge: dict):
     knowledge["last_updated"] = datetime.now().isoformat()
     try:
+        os.makedirs(os.path.dirname(KNOWLEDGE_FILE), exist_ok=True)
         with open(KNOWLEDGE_FILE, "w") as f:
             json.dump(knowledge, f, indent=2)
     except Exception:
@@ -117,6 +123,8 @@ def _auto_seed_fast_sites(knowledge: dict, steps: list, success: bool):
             pass
 
     for domain, count in domain_steps.items():
+        if domain in IGNORED_DOMAINS:
+            continue
         site = sites_node.setdefault(domain, {
             "success_count": 0, "fail_count": 0, "avg_steps": 0,
             "total_steps": 0, "runs": 0, "tips": [], "navigation_hint": "", "last_seen": None,
@@ -172,6 +180,8 @@ def _auto_correct_blocked_sites(knowledge: dict, steps: list, result: str):
     from backend.memory.agent_memory import mark_blocked, mark_works, _load as load_mem, _save as save_mem
 
     for domain, descs in domain_steps.items():
+        if domain in IGNORED_DOMAINS:
+            continue
         combined_desc = " ".join(descs)
         is_blocked = any(sig in combined_desc for sig in block_signals) or \
                      any(sig in result_lower[max(0, result_lower.find(domain)-200):
@@ -214,6 +224,8 @@ def _learn_site_performance(knowledge: dict, steps: list, result: str, success: 
     failure_signals = ["blocked", "captcha", "could not", "unable", "failed", "error", "not found"]
 
     for domain, domain_step_list in domain_steps.items():
+        if domain in IGNORED_DOMAINS:
+            continue
         site = sites_node.setdefault(domain, {
             "success_count": 0, "fail_count": 0,
             "avg_steps": 0, "total_steps": 0, "runs": 0,
@@ -304,6 +316,8 @@ def _learn_navigation_patterns(knowledge: dict, steps: list, result: str):
             pass
 
     for domain, sequence in domain_sequences.items():
+        if domain in IGNORED_DOMAINS:
+            continue
         if len(sequence) < 2:
             continue
         site = sites_node.setdefault(domain, {
@@ -402,6 +416,8 @@ def _update_domain_shortcuts(knowledge: dict, query: str, steps: list):
 
     existing = shortcuts.get(cat, [])
     for domain in domains[:3]:
+        if domain in IGNORED_DOMAINS:
+            continue
         if domain in existing:
             existing.remove(domain)
         existing.insert(0, domain)  # most recently successful goes first
