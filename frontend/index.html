@@ -1207,16 +1207,12 @@ function startThinking(taskId) {
       <span>Vayu</span>
     </div>
     <div class="thinking-wrap">
-      <div class="thinking-bubble">
-        <div class="globe">
-          <div class="ring"></div><div class="ring"></div><div class="core"></div>
-        </div>
+      <div class="thinking-bubble" id="thinking-bubble-el" style="border-left: 2px solid var(--accent); padding: 10px 16px;">
         <div class="thinking-info">
           <div class="thinking-status">
-            Browsing the web
+            Thinking
             <div class="dots"><span></span><span></span><span></span></div>
           </div>
-          <div class="thinking-url" id="thinking-url">Initialising…</div>
         </div>
       </div>
       <div class="step-log" id="step-log" style="display:none"></div>
@@ -1225,11 +1221,31 @@ function startThinking(taskId) {
   thinkingEl = wrap;
   stepLogEl = document.getElementById('step-log');
   let lastCount = 0;
+  let hasTransitioned = false;
   stepPollInterval = setInterval(async () => {
     try {
       const r = await fetch(`${API}/tasks/${taskId}/steps`);
       const d = await r.json();
       const steps = d.steps || [];
+      if (steps.length > 0 && !hasTransitioned) {
+        hasTransitioned = true;
+        const bubble = document.getElementById('thinking-bubble-el');
+        if (bubble) {
+          bubble.innerHTML = `
+            <div class="globe">
+              <div class="ring"></div><div class="ring"></div><div class="core"></div>
+            </div>
+            <div class="thinking-info">
+              <div class="thinking-status">
+                Browsing the web
+                <div class="dots"><span></span><span></span><span></span></div>
+              </div>
+              <div class="thinking-url" id="thinking-url">Initialising…</div>
+            </div>`;
+          bubble.style.padding = '';
+          bubble.style.borderLeft = '';
+        }
+      }
       if (steps.length > lastCount) {
         const newSteps = steps.slice(lastCount);
         newSteps.forEach(s => addStepEntry(s));

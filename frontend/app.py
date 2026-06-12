@@ -74,7 +74,7 @@ async def handle_resume_upload(path: str, message: str):
 
 
 async def run_research(query: str, chat_history: list):
-    msg = cl.Message(content="🔍 Analysing your query...")
+    msg = cl.Message(content="Thinking...")
     await msg.send()
 
     try:
@@ -95,9 +95,16 @@ async def run_research(query: str, chat_history: list):
 
 async def poll_task(task_id: str, msg: cl.Message, original_query: str):
     dots = 0
+    has_browsed = False
     async with httpx.AsyncClient(timeout=10) as client:
         while True:
             try:
+                # Check steps first to see if the browser agent started
+                steps_resp = await client.get(f"{API_BASE}/tasks/{task_id}/steps")
+                steps = steps_resp.json().get("steps", [])
+                if len(steps) > 0:
+                    has_browsed = True
+
                 resp = await client.get(f"{API_BASE}/tasks/{task_id}")
                 task = resp.json()
             except Exception:
@@ -121,7 +128,7 @@ async def poll_task(task_id: str, msg: cl.Message, original_query: str):
                                 f"{API_BASE}/tasks/{task_id}/answer",
                                 json={"answer": answer["output"]},
                             )
-                        msg.content = "🔍 Got it — researching now..."
+                        msg.content = "Thinking..."
                         await msg.update()
                     except Exception as e:
                         msg.content = f"❌ Failed to submit answer: {e}"
@@ -139,17 +146,21 @@ async def poll_task(task_id: str, msg: cl.Message, original_query: str):
                 needs_review = task.get("needs_review") or result.get("needs_review", False)
                 gaps = result.get("gaps", [])
 
-                # Build confidence badge
-                conf_badge = _confidence_badge(confidence)
+                if not has_browsed:
+                    msg.content = answer_text
+                else:
+                    # Build confidence badge
+                    conf_badge = _confidence_badge(confidence)
 
-                # Build review warning
-                review_warning = ""
-                if needs_review:
-                    review_warning = "\n\n⚠️ **Low confidence — recommend verifying manually.**"
-                    if gaps:
-                        review_warning += f"\n*Missing: {', '.join(gaps[:2])}*"
+                    # Build review warning
+                    review_warning = ""
+                    if needs_review:
+                        review_warning = "\n\n⚠️ **Low confidence — recommend verifying manually.**"
+                        if gaps:
+                            review_warning += f"\n*Missing: {', '.join(gaps[:2])}*"
 
-                msg.content = f"🔍 **Research complete** {conf_badge}\n\n{answer_text}{review_warning}"
+                    msg.content = f"🔍 **Research complete** {conf_badge}\n\n{answer_text}{review_warning}"
+                
                 await msg.update()
 
                 # Update chat history
@@ -166,7 +177,10 @@ async def poll_task(task_id: str, msg: cl.Message, original_query: str):
 
             else:
                 dots = (dots % 3) + 1
-                msg.content = f"🔍 Browsing the web{'.' * dots}"
+                if has_browsed:
+                    msg.content = f"🔍 Browsing the web{'.' * dots}"
+                else:
+                    msg.content = f"Thinking{'.' * dots}"
                 await msg.update()
                 await asyncio.sleep(2)
 
