@@ -27,6 +27,7 @@ Vayu is a **FastAPI + browser-use + Gemini** system. An LLM-based intent router 
 | General Research | "Top AI startups in India 2025" | Research Agent (10-capability pipeline) |
 | Price/Option Comparison | "Samsung S24 vs iPhone 15 prices?" | Comparison Agent (Google-first discovery & comparison table) |
 | Travel, Jobs, & Hackathons | "Flights Mumbai → Delhi on June 15", "Python jobs in Bangalore" | Handled generalized via dynamic context memory injection |
+| Conversational / Chit-chat | "hello", "thanks", "what is my name" | Handled directly via task router using context history (no browser task) |
 
 ---
 
@@ -84,7 +85,8 @@ Research Agent (10-capability pipeline)    Comparison Agent
 
 ### Key AI Design Patterns
 
-- **Intent Classification** — LLM-based routing with few-shot rules, zero regex
+- **Intent Classification** — LLM-based routing with few-shot rules, zero regex. Now supports context-aware chit-chat and conversational routing.
+- **Conversational Memory** — Follow-up queries (like "What is my name?") utilize preceding conversation history directly inside chit-chat or research contexts.
 - **Query Engineering** — Google operator injection (`site:`, `filetype:`, date filters)
 - **Temporal Awareness** — "latest/new" queries auto-inject current year into searches
 - **Self-Verification** — Verifier LLM scores every result; triggers retry with hint
