@@ -24,6 +24,7 @@ Just type anything — I'll figure out where to search."""
 @cl.on_chat_start
 async def start():
     cl.user_session.set("resume_text", None)
+    cl.user_session.set("chat_history", [])
     await cl.Message(content=WELCOME).send()
 
 
@@ -40,7 +41,8 @@ async def handle_message(message: cl.Message):
     if resume and any(w in query.lower() for w in ["job", "hackathon", "opportunity", "apply"]):
         query = f"{query}\n\nMy profile: {resume[:400]}"
 
-    await run_research(query)
+    chat_history = cl.user_session.get("chat_history") or []
+    await run_research(query, chat_history)
 
 
 async def handle_resume_upload(path: str, message: str):
@@ -64,19 +66,23 @@ async def handle_resume_upload(path: str, message: str):
         )
         await msg.update()
         if message.strip():
-            await run_research(f"{message}\n\nMy profile: {data.get('resume_text','')[:400]}")
+            chat_history = cl.user_session.get("chat_history") or []
+            await run_research(f"{message}\n\nMy profile: {data.get('resume_text','')[:400]}", chat_history)
     except Exception as e:
         msg.content = f"Resume parse failed: {e}"
         await msg.update()
 
 
-async def run_research(query: str):
+async def run_research(query: str, chat_history: list):
     msg = cl.Message(content="🔍 Analysing your query...")
     await msg.send()
 
     try:
         async with httpx.AsyncClient(timeout=15) as client:
-            resp = await client.post(f"{API_BASE}/tasks/research", json={"query": query})
+            resp = await client.post(
+                f"{API_BASE}/tasks/research",
+                json={"query": query, "context": chat_history}
+            )
             task = resp.json()
     except Exception as e:
         msg.content = f"❌ Failed to start: {e}"
@@ -84,10 +90,10 @@ async def run_research(query: str):
         return
 
     task_id = task["task_id"]
-    await poll_task(task_id, msg)
+    await poll_task(task_id, msg, query)
 
 
-async def poll_task(task_id: str, msg: cl.Message):
+async def poll_task(task_id: str, msg: cl.Message, original_query: str):
     dots = 0
     async with httpx.AsyncClient(timeout=10) as client:
         while True:
@@ -145,6 +151,12 @@ async def poll_task(task_id: str, msg: cl.Message):
 
                 msg.content = f"🔍 **Research complete** {conf_badge}\n\n{answer_text}{review_warning}"
                 await msg.update()
+
+                # Update chat history
+                history = cl.user_session.get("chat_history") or []
+                history.append({"role": "user", "content": original_query})
+                history.append({"role": "assistant", "content": answer_text})
+                cl.user_session.set("chat_history", history[-10:])
                 break
 
             elif status == "failed":
