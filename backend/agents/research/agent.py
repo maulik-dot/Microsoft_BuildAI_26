@@ -129,7 +129,13 @@ SUCCESS CONDITION: {success_condition}
 RESEARCH INSTRUCTIONS:
 1. Start at https://www.google.com — search for the most relevant query
 2. Open the top 3-5 most relevant results
-3. Extract thorough, accurate information from each page. If you find specific products, places, or listings (like jobs, hotels, flights), you MUST click into their individual details pages to extract: the direct page URL from the browser's address bar, and the primary image URL (direct source link of the main image). Do NOT copy generic homepage links or search results page links.
+3. Extract thorough, accurate information from each page:
+   - For specific products or listings (e.g., jobs, hotels, flights), you MUST extract the direct purchase/listing page link and primary image URL.
+   - If searching e-commerce sites (like Amazon, Flipkart, Myntra), you can reliably and instantly extract the products, prices, direct href links, and image source URLs by running a JavaScript query with the 'evaluate' tool on the search results page:
+     * Amazon: `Array.from(document.querySelectorAll('[data-component-type="s-search-result"]')).map(el => { const a = el.querySelector('h2 a'); const img = el.querySelector('.s-image'); const p = el.querySelector('.a-price-whole'); return {name: a?.innerText, url: a?.href, price: p?.innerText, image: img?.src}; }).filter(x => x.name && x.url)`
+     * Flipkart: `Array.from(document.querySelectorAll('div[data-id]')).map(el => { const a = el.querySelector('a'); const img = el.querySelector('img'); const p = el.querySelector('div._30jeq3, div._1vC4Qe'); return {name: a?.innerText || a?.title, url: a?.href, price: p?.innerText, image: img?.src}; }).filter(x => x.name && x.url)`
+   - If not on a search results page, navigate to details pages to capture the direct links (from address bar) and image src URLs.
+   - Do NOT use generic homepage links (like amazon.in).
 4. Cross-reference across sources for accuracy
 5. If one approach fails, try a different site or search query
 6. After visiting each site, note key findings in your memory

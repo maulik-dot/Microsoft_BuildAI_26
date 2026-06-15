@@ -95,9 +95,15 @@ For each site discovered:
 - Navigate to it and search for the specific item/query
 - If it BLOCKS you (CAPTCHA, login wall, bot detection) within 3 steps → STOP, move to next site, and remember it failed
 - If it WORKS:
-  1. For the top 2 matching products under the budget/limit, you MUST click on the product to navigate to its specific details page.
-  2. On the product details page, extract: the exact product name, price/option, rating, the direct product page URL (from the browser's address bar), and the primary product image URL (the direct source URL of the main product image).
-  3. Do NOT just copy the homepage URL (like amazon.in). You MUST extract the specific direct product page link and direct product image URL.
+  * Extract: the exact product name, price/option, rating, direct product page URL, and the primary product image URL.
+  * To get these reliably and instantly without clicking into details pages (which is slow and opens new tabs), you can use the 'evaluate' tool on the search results page to run a JavaScript script to scrape the product list:
+    - For Amazon:
+      `Array.from(document.querySelectorAll('[data-component-type="s-search-result"]')).map(el => { const a = el.querySelector('h2 a'); const img = el.querySelector('.s-image'); const p = el.querySelector('.a-price-whole'); return {name: a?.innerText, url: a?.href, price: p?.innerText, image: img?.src}; }).filter(x => x.name && x.url)`
+    - For Flipkart:
+      `Array.from(document.querySelectorAll('div[data-id]')).map(el => { const a = el.querySelector('a'); const img = el.querySelector('img'); const p = el.querySelector('div._30jeq3, div._1vC4Qe'); return {name: a?.innerText || a?.title, url: a?.href, price: p?.innerText, image: img?.src}; }).filter(x => x.name && x.url)`
+    - For Myntra:
+      `Array.from(document.querySelectorAll('.product-base')).map(el => { const a = el.querySelector('a'); const img = el.querySelector('img'); const p = el.querySelector('.product-discountedPrice, .product-price'); return {name: el.querySelector('.product-product')?.innerText, url: a?.href, price: p?.innerText, image: img?.src}; }).filter(x => x.name && x.url)`
+  * Print the direct purchase links and product image URLs in your final answer. Do NOT use generic homepage links like amazon.in.
 - Keep going until you have data from at least 2 working sources
 
 STEP 3 — LEARN AND REPORT:
