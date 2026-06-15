@@ -110,6 +110,7 @@ For product:
 - description: short 1-2 sentence description
 - price: price (e.g. "₹79,900" or "$999")
 - rating: numeric rating (e.g. 4.6)
+- image: primary image URL found in report (if present, otherwise keep empty)
 - official_url: official page URL
 - external_links: list of objects with "label" and "url" (e.g. Amazon, Flipkart, etc. found in report)
 
@@ -119,6 +120,7 @@ For place:
 - address: address/location details
 - hours: opening hours if mentioned
 - rating: numeric rating (e.g. 4.8)
+- image: primary image URL found in report (if present, otherwise keep empty)
 - official_url: official page URL
 - external_links: list of objects with "label" and "url" (e.g. Google Maps)
 
@@ -127,6 +129,7 @@ For media (movie/book):
 - description: summary
 - year: release year
 - genre: genre details
+- image: primary image URL found in report (if present, otherwise keep empty)
 - official_url: official link
 - external_links: list of objects with "label" and "url" (e.g. IMDb, Goodreads)
 
@@ -134,6 +137,7 @@ For profile (person):
 - title: entity name
 - description: short bio
 - occupation: occupation
+- image: primary image URL found in report (if present, otherwise keep empty)
 - official_url: homepage/social link
 - external_links: list of objects with "label" and "url"
 
@@ -224,7 +228,7 @@ async def enrich_response(query: str, res: dict) -> dict:
                 "type": ent_type,
                 "title": llm_data.get("title") or name,
                 "description": llm_data.get("description") or wiki_res.get("description") or "",
-                "image": wiki_res.get("image") or _extract_image_from_text(name, result_text) or "",
+                "image": llm_data.get("image") or wiki_res.get("image") or _extract_image_from_text(name, result_text) or "",
                 "official_url": wiki_res.get("official_url") or llm_data.get("official_url") or "",
                 "external_links": llm_data.get("external_links") or [],
             }

@@ -129,7 +129,7 @@ SUCCESS CONDITION: {success_condition}
 RESEARCH INSTRUCTIONS:
 1. Start at https://www.google.com — search for the most relevant query
 2. Open the top 3-5 most relevant results
-3. Extract thorough, accurate information from each page
+3. Extract thorough, accurate information from each page (including direct page links and primary image URLs for any specific products, places, or entities found)
 4. Cross-reference across sources for accuracy
 5. If one approach fails, try a different site or search query
 6. After visiting each site, note key findings in your memory
@@ -143,7 +143,7 @@ HANDLING OBSTACLES:
 
 OUTPUT FORMAT:
 - Direct answer to the query upfront (1-2 sentences)
-- Detailed findings in sections with tables/lists where appropriate
+- Detailed findings in sections with tables/lists where appropriate. For products or identifiable entities, always include their name, price, direct purchase page URL, and primary image URL.
 - Source URLs for every major claim
 - "Key Takeaway" at the end""")
 

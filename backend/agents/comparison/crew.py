@@ -94,14 +94,14 @@ STEP 2 — TRY EACH SOURCE (max 8-10 steps per site):
 For each site discovered:
 - Navigate to it and search for the specific item/query
 - If it BLOCKS you (CAPTCHA, login wall, bot detection) within 3 steps → STOP, move to next site, and remember it failed
-- If it WORKS → extract: name, price/option, offers, rating, URL
+- If it WORKS → extract: name, price/option, offers, rating, direct product page URL (direct purchase link), and the primary product image URL (extract the direct image source link)
 - Keep going until you have data from at least 2 working sources
 
 STEP 3 — LEARN AND REPORT:
 After trying sites, in your FINAL RESULT include:
-- A comparison table with all working sources side by side
+- A comparison table with all working sources side by side, including product name, price, rating, direct page link, and product image URL
 - BEST VALUE = [site] at [price/option] because [reason]
-- Direct links to each result found
+- Direct links and product image URLs to each result found
 - Note any sites that were blocked (so future searches skip them)
 
 IMPORTANT RULES:
