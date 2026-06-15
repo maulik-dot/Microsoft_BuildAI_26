@@ -22,7 +22,7 @@ from backend.tools.verifier import verify
 from backend.memory.agent_memory import get_general_context, update_general
 from backend.tools.model_selector import record_eval, get_model_for_tier, ModelTier
 
-MAX_RETRIES = 2
+MAX_RETRIES = 1
 
 
 async def run_research(query: str, task_id: str = "") -> dict:

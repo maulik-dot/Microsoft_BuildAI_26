@@ -32,17 +32,17 @@ def verify(query: str, result: str, success_condition: str) -> dict:
 
     result_lower = result.lower()
 
-    # Quick fail: result contains block indicators
+    # Quick fail: result contains block indicators (only if the response is too short, indicating a pure failure page)
     block_signals = [p for p in BLOCKED_PATTERNS if p in result_lower]
     failure_signals = ["could not find", "unable to", "no results", "blocked", "not available",
                        "failed to", "error occurred", "access denied", "try again"]
     failures = [s for s in failure_signals if s in result_lower]
 
-    if len(failures) >= 3 or len(block_signals) >= 2:
+    if len(result.strip()) < 400 and (len(failures) >= 3 or len(block_signals) >= 2):
         return {
             "passed": False,
             "confidence": 15,
-            "gaps": ["Multiple failure signals detected in result"],
+            "gaps": ["Multiple failure signals detected in short result"],
             "needs_human_review": True,
             "retry_hint": "Sites may be blocking access — try Google search approach instead of direct navigation",
         }
@@ -76,17 +76,25 @@ Return only valid JSON, no markdown."""
 
     raw = _call_llm(prompt, task_type="verification")
     if not raw:
-        # Heuristic fallback: check for URLs and concrete data
-        has_urls = bool(re.search(r'https?://', result))
-        has_prices = bool(re.search(r'₹\d|Rs\.\d|\$\d', result))
-        confidence = 60 if (has_urls and has_prices) else 40
-        return {
-            "passed": confidence >= 50,
-            "confidence": confidence,
-            "gaps": [],
-            "needs_human_review": confidence < 50,
-            "retry_hint": "Retry with more specific search terms",
-        }
+        # Heuristic fallback: check if we have a reasonable length response without obvious block/failure signs
+        has_blocked = len(block_signals) > 0
+        has_failed = len(failures) >= 3
+        if len(result.strip()) > 100 and not has_blocked and not has_failed:
+            return {
+                "passed": True,
+                "confidence": 70,
+                "gaps": [],
+                "needs_human_review": True,
+                "retry_hint": "",
+            }
+        else:
+            return {
+                "passed": False,
+                "confidence": 30,
+                "gaps": ["Fallback verification failed — result appears incomplete or blocked"],
+                "needs_human_review": True,
+                "retry_hint": "Try a different search query or site",
+            }
 
     if raw.startswith("```"):
         raw = raw.split("```")[1]
