@@ -94,14 +94,17 @@ STEP 2 — TRY EACH SOURCE (max 8-10 steps per site):
 For each site discovered:
 - Navigate to it and search for the specific item/query
 - If it BLOCKS you (CAPTCHA, login wall, bot detection) within 3 steps → STOP, move to next site, and remember it failed
-- If it WORKS → extract: name, price/option, offers, rating, direct product page URL (direct purchase link), and the primary product image URL (extract the direct image source link)
+- If it WORKS:
+  1. For the top 2 matching products under the budget/limit, you MUST click on the product to navigate to its specific details page.
+  2. On the product details page, extract: the exact product name, price/option, rating, the direct product page URL (from the browser's address bar), and the primary product image URL (the direct source URL of the main product image).
+  3. Do NOT just copy the homepage URL (like amazon.in). You MUST extract the specific direct product page link and direct product image URL.
 - Keep going until you have data from at least 2 working sources
 
 STEP 3 — LEARN AND REPORT:
 After trying sites, in your FINAL RESULT include:
-- A comparison table with all working sources side by side, including product name, price, rating, direct page link, and product image URL
+- A comparison table with all working sources side by side, including product name, price, rating, direct purchase page link, and product image URL
 - BEST VALUE = [site] at [price/option] because [reason]
-- Direct links and product image URLs to each result found
+- Direct purchase page links and product image URLs to each result found
 - Note any sites that were blocked (so future searches skip them)
 
 IMPORTANT RULES:
