@@ -79,6 +79,12 @@ async def run_comparison(query: str, task_id: str = "") -> dict:
     task = f"""{memory_ctx}
 {learned_ctx}
 
+CRITICAL: For every product/item you find, you MUST extract and print:
+1. The exact name and brand
+2. The price and rating
+3. The exact direct purchase page URL (do NOT use generic homepages like amazon.in or flipkart.com)
+4. The exact direct product image source URL (starts with http, usually ending in .jpg, .png, etc.)
+
 COMPARISON QUERY: {query}
 
 YOUR TASK — find the best result by comparing multiple sources:
@@ -107,11 +113,18 @@ For each site discovered:
 - Keep going until you have data from at least 2 working sources
 
 STEP 3 — LEARN AND REPORT:
-After trying sites, in your FINAL RESULT include:
-- A comparison table with all working sources side by side, including product name, price, rating, direct purchase page link, and product image URL
+After trying sites, in your FINAL RESULT you MUST include:
+- A comparison table with all working sources side by side, including product name, price, rating, direct purchase page link, and product image URL.
+- A detailed list of found products containing the exact direct links and image URLs formatted EXACTLY like this for each product:
+  * Product: [Product Name]
+  * Price: [Price]
+  * Direct Link: [Paste Direct Page URL here]
+  * Image Link: [Paste Direct Image Source URL here]
 - BEST VALUE = [site] at [price/option] because [reason]
 - Direct purchase page links and product image URLs to each result found
 - Note any sites that were blocked (so future searches skip them)
+
+Remember, if you do not print the raw Direct Link and Image Link URLs in the detailed list, the user will not see them, and the task will fail!"""
 
 IMPORTANT RULES:
 - Always start with Google to discover sources — don't assume which sites are best

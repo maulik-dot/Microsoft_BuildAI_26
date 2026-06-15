@@ -149,7 +149,11 @@ HANDLING OBSTACLES:
 
 OUTPUT FORMAT:
 - Direct answer to the query upfront (1-2 sentences)
-- Detailed findings in sections with tables/lists where appropriate. For products or identifiable entities, always include their name, price, direct purchase page URL (direct purchase/details link), and primary image URL.
+- Detailed findings in sections with tables/lists where appropriate. For products or identifiable entities, you MUST include a detailed list containing the exact direct links and image URLs formatted EXACTLY like this for each item:
+  * Product: [Name]
+  * Price: [Price]
+  * Direct Link: [Paste Direct Page URL here]
+  * Image Link: [Paste Direct Image Source URL here]
 - Source URLs for every major claim
 - "Key Takeaway" at the end""")
 
