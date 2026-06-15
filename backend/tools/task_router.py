@@ -78,10 +78,13 @@ Return only your direct reply.""", task_type="planning")
 
     elif task_type == "comparison":
         from backend.agents.comparison.crew import run_comparison
-        return await run_comparison(query, task_id=task_id)
+        res = await run_comparison(query, task_id=task_id)
     else:
         from backend.agents.research.agent import run_research
-        return await run_research(query, task_id=task_id)
+        res = await run_research(query, task_id=task_id)
+
+    from backend.tools.rich_cards import enrich_response
+    return await enrich_response(query, res)
 
 
 # ── Param parsers ──────────────────────────────────────────────────────────

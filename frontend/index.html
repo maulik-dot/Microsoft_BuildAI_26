@@ -982,6 +982,230 @@ main {
   #chat { padding: 20px 12px; }
   .bubble { font-size: 15px; }
 }
+
+/* ── RICH ANSWER CARDS ────────────────────────────────────────────────── */
+.rich-card {
+  background: var(--bg3);
+  border: 1px solid var(--border2);
+  border-radius: 12px;
+  overflow: hidden;
+  max-width: 100%;
+  width: 420px;
+  margin: 12px 0;
+  display: flex;
+  flex-direction: column;
+  transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+}
+.rich-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px var(--accent-glow);
+  border-color: var(--accent);
+}
+.rich-card-img-container {
+  width: 100%;
+  height: 200px;
+  background: var(--bg4);
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-bottom: 1px solid var(--border);
+  overflow: hidden;
+}
+.rich-card-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.3s;
+}
+.rich-card:hover .rich-card-img {
+  transform: scale(1.04);
+}
+.rich-card-placeholder-icon {
+  font-size: 48px;
+  color: var(--text3);
+  opacity: 0.7;
+}
+.rich-card-body {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.rich-card-tag {
+  align-self: flex-start;
+  background: var(--accent-dim);
+  color: var(--accent);
+  padding: 2px 8px;
+  font-size: 10px;
+  font-weight: 600;
+  border-radius: 4px;
+  text-transform: uppercase;
+  font-family: var(--mono);
+}
+.rich-card-title {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0;
+  line-height: 1.35;
+}
+.rich-card-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 13px;
+  color: var(--text2);
+}
+.rich-card-rating {
+  color: var(--yellow);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 600;
+}
+.rich-card-price {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--pink);
+}
+.rich-card-desc {
+  font-size: 13px;
+  color: var(--text2);
+  line-height: 1.5;
+  margin: 4px 0 8px;
+}
+.rich-card-footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+.rich-card-btn {
+  flex: 1;
+  min-width: 100px;
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  text-align: center;
+  border-radius: 6px;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background 0.15s, opacity 0.15s;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+.rich-card-btn-primary {
+  background: var(--accent);
+  color: #000;
+}
+.rich-card-btn-primary:hover {
+  opacity: 0.9;
+}
+.rich-card-btn-secondary {
+  background: var(--bg4);
+  border: 1px solid var(--border3);
+  color: var(--text2);
+}
+.rich-card-btn-secondary:hover {
+  color: var(--text);
+  border-color: var(--accent);
+}
+
+/* Horizontal Carousel */
+.carousel-container {
+  display: flex;
+  gap: 16px;
+  overflow-x: auto;
+  padding: 8px 4px 16px 4px;
+  margin: 12px 0;
+  scroll-behavior: smooth;
+  scroll-snap-type: x mandatory;
+}
+.carousel-container::-webkit-scrollbar {
+  height: 6px;
+}
+.carousel-container::-webkit-scrollbar-thumb {
+  background: var(--border3);
+  border-radius: 4px;
+}
+.carousel-container::-webkit-scrollbar-track {
+  background: transparent;
+}
+.carousel-card {
+  flex: 0 0 280px;
+  scroll-snap-align: start;
+  background: var(--bg3);
+  border: 1px solid var(--border2);
+  border-radius: 12px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
+.carousel-card:hover {
+  border-color: var(--accent);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px var(--accent-glow);
+}
+.carousel-card-img-container {
+  width: 100%;
+  height: 140px;
+  background: var(--bg4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-bottom: 1px solid var(--border);
+}
+.carousel-card-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.3s;
+}
+.carousel-card:hover .carousel-card-img {
+  transform: scale(1.04);
+}
+.carousel-card-body {
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+}
+.carousel-card-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.carousel-card-desc {
+  font-size: 11.5px;
+  color: var(--text2);
+  line-height: 1.4;
+  height: 50px;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  margin: 4px 0 2px;
+}
+.carousel-card-price {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--pink);
+  margin-top: auto;
+}
+}
 </style>
 </head>
 <body>
@@ -1309,9 +1533,23 @@ async function poll(taskId) {
     if (task.status === 'completed') {
       stopThinking();
       const result = task.result || {};
-      const text = result.result || result.summary || '';
-      const displayText = text || 'Task completed — no result returned. Try rephrasing.';
-      addAgentMsg(displayText);
+      const resVal = result.result;
+      
+      let displayText = '';
+      let cards = null;
+      
+      if (resVal && typeof resVal === 'object' && resVal.answer !== undefined) {
+        displayText = resVal.answer;
+        cards = resVal.cards;
+      } else {
+        displayText = resVal || result.summary || '';
+      }
+      
+      if (!displayText) {
+        displayText = 'Task completed — no result returned. Try rephrasing.';
+      }
+      
+      addAgentMsg(displayText, cards);
       chatHistory.push({role: "agent", content: displayText.slice(0, 2000)});
       if (chatHistory.length > MAX_HISTORY) chatHistory = chatHistory.slice(-MAX_HISTORY);
       _saveAfterReply();
@@ -1417,7 +1655,169 @@ function addUserMsg(text) {
   appendToChat(el);
 }
 
-function addAgentMsg(md) {
+function renderSingleCard(card) {
+  const type = card.type || 'product';
+  const title = card.title || 'Entity';
+  const imgUrl = card.image || '';
+  const desc = card.description || '';
+  const officialUrl = card.official_url || '';
+  const extLinks = card.external_links || [];
+  
+  let imageHtml = '';
+  if (imgUrl) {
+    imageHtml = `<img src="${esc(imgUrl)}" class="rich-card-img" alt="${esc(title)}">`;
+  } else {
+    let icon = '📦';
+    if (type === 'place') icon = '📍';
+    if (type === 'media') icon = '🎬';
+    if (type === 'profile') icon = '👤';
+    imageHtml = `<div class="rich-card-placeholder-icon">${icon}</div>`;
+  }
+  
+  let typeTag = type.toUpperCase();
+  let detailsHtml = '';
+  
+  if (type === 'product') {
+    const brand = card.brand ? `<div>Brand: <strong>${esc(card.brand)}</strong></div>` : '';
+    const price = card.price ? `<div class="rich-card-price">${esc(card.price)}</div>` : '';
+    const rating = card.rating ? `
+      <div class="rich-card-rating">
+        <span>★</span> <span>${card.rating}</span>
+      </div>` : '';
+    detailsHtml = `
+      <div class="rich-card-meta">
+        ${brand}
+        ${rating}
+      </div>
+      ${price}
+    `;
+  } else if (type === 'place') {
+    typeTag = 'LOCATION';
+    const rating = card.rating ? `
+      <div class="rich-card-rating">
+        <span>★</span> <span>${card.rating}</span>
+      </div>` : '';
+    const address = card.address ? `<div style="font-size:12.5px;color:var(--text2)">📍 ${esc(card.address)}</div>` : '';
+    const hours = card.hours ? `<div style="font-size:12.5px;color:var(--text3)">🕒 ${esc(card.hours)}</div>` : '';
+    detailsHtml = `
+      <div class="rich-card-meta">
+        ${rating}
+      </div>
+      ${address}
+      ${hours}
+    `;
+  } else if (type === 'media') {
+    typeTag = 'MEDIA';
+    const year = card.year ? `<span>📅 ${esc(card.year)}</span>` : '';
+    const genre = card.genre ? `<span>🏷️ ${esc(card.genre)}</span>` : '';
+    detailsHtml = `
+      <div class="rich-card-meta">
+        ${year}
+        ${genre}
+      </div>
+    `;
+  } else if (type === 'profile') {
+    typeTag = 'PROFILE';
+    const occ = card.occupation ? `<div style="font-weight:600;color:var(--accent)">${esc(card.occupation)}</div>` : '';
+    detailsHtml = occ;
+  }
+  
+  let buttonsHtml = '';
+  if (officialUrl) {
+    buttonsHtml += `<a href="${officialUrl}" target="_blank" class="rich-card-btn rich-card-btn-primary">Official Site</a>`;
+  }
+  extLinks.forEach(link => {
+    buttonsHtml += `<a href="${link.url}" target="_blank" class="rich-card-btn rich-card-btn-secondary">${esc(link.label)}</a>`;
+  });
+  if (buttonsHtml) {
+    buttonsHtml = `<div class="rich-card-footer">${buttonsHtml}</div>`;
+  }
+  
+  return `
+    <div class="rich-card">
+      <div class="rich-card-img-container">
+        ${imageHtml}
+      </div>
+      <div class="rich-card-body">
+        <span class="rich-card-tag">${typeTag}</span>
+        <h3 class="rich-card-title">${esc(title)}</h3>
+        ${detailsHtml}
+        <p class="rich-card-desc">${esc(desc)}</p>
+        ${buttonsHtml}
+      </div>
+    </div>
+  `;
+}
+
+function renderCarousel(cards) {
+  let cardsHtml = '';
+  cards.forEach(card => {
+    const type = card.type || 'product';
+    const title = card.title || 'Entity';
+    const imgUrl = card.image || '';
+    const desc = card.description || '';
+    const officialUrl = card.official_url || '';
+    const price = card.price || '';
+    const rating = card.rating || '';
+    const brand = card.brand || '';
+    
+    let imageHtml = '';
+    if (imgUrl) {
+      imageHtml = `<img src="${esc(imgUrl)}" class="carousel-card-img" alt="${esc(title)}">`;
+    } else {
+      let icon = '📦';
+      if (type === 'place') icon = '📍';
+      if (type === 'media') icon = '🎬';
+      if (type === 'profile') icon = '👤';
+      imageHtml = `<div style="font-size:32px;color:var(--text3)">${icon}</div>`;
+    }
+    
+    let metaHtml = '';
+    if (price) {
+      metaHtml += `<div class="carousel-card-price">${esc(price)}</div>`;
+    } else if (brand) {
+      metaHtml += `<div style="font-size:12px;color:var(--accent)">${esc(brand)}</div>`;
+    } else if (rating) {
+      metaHtml += `<div style="font-size:12px;color:var(--yellow)">★ ${rating}</div>`;
+    }
+    
+    const navUrl = officialUrl || (card.external_links && card.external_links.length > 0 ? card.external_links[0].url : '#');
+    cardsHtml += `
+      <div class="carousel-card" onclick="window.open('${esc(navUrl)}', '_blank')">
+        <div class="carousel-card-img-container">
+          ${imageHtml}
+        </div>
+        <div class="carousel-card-body">
+          <h4 class="carousel-card-title">${esc(title)}</h4>
+          ${metaHtml}
+          <p class="carousel-card-desc">${esc(desc)}</p>
+        </div>
+      </div>
+    `;
+  });
+  
+  return `
+    <div class="carousel-container">
+      ${cardsHtml}
+    </div>
+  `;
+}
+
+function addAgentMsg(md, cards) {
+  if (md && typeof md === 'object') {
+    cards = md.cards;
+    md = md.answer || md.result || '';
+  }
+  
+  let cardsHtml = '';
+  if (cards && cards.length > 0) {
+    if (cards.length === 1) {
+      cardsHtml = renderSingleCard(cards[0]);
+    } else {
+      cardsHtml = renderCarousel(cards);
+    }
+  }
+
   const el = document.createElement('div');
   el.className = 'msg agent';
   el.innerHTML = `
@@ -1426,6 +1826,7 @@ function addAgentMsg(md) {
       <span>Vayu</span>
       <span style="margin-left:auto;color:var(--text3)">${ts()}</span>
     </div>
+    ${cardsHtml}
     <div class="bubble"><div class="md-content">${marked.parse(md||'')}</div></div>
     <div class="msg-actions">
       <button class="act-btn" onclick="copyMsg(this)">Copy</button>

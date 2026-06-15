@@ -141,25 +141,37 @@ async def poll_task(task_id: str, msg: cl.Message, original_query: str):
 
             elif status == "completed":
                 result = task.get("result") or {}
-                answer_text = result.get("result") or "No result returned."
+                res_val = result.get("result")
+                
+                answer_text = ""
+                cards = []
+                
+                if isinstance(res_val, dict) and "answer" in res_val:
+                    answer_text = res_val["answer"]
+                    cards = res_val.get("cards", [])
+                else:
+                    answer_text = res_val or result.get("summary") or "No result returned."
+
                 confidence = task.get("confidence") or result.get("confidence")
                 needs_review = task.get("needs_review") or result.get("needs_review", False)
                 gaps = result.get("gaps", [])
 
-                if not has_browsed:
-                    msg.content = answer_text
-                else:
-                    # Build confidence badge
-                    conf_badge = _confidence_badge(confidence)
+                # Format cards as Markdown for Chainlit
+                cards_markdown = ""
+                if cards:
+                    cards_markdown = "\n\n".join(format_card_for_chainlit(c) for c in cards) + "\n\n---\n\n"
 
-                    # Build review warning
+                if not has_browsed:
+                    msg.content = f"{cards_markdown}{answer_text}" if cards_markdown else answer_text
+                else:
+                    conf_badge = _confidence_badge(confidence)
                     review_warning = ""
                     if needs_review:
                         review_warning = "\n\n⚠️ **Low confidence — recommend verifying manually.**"
                         if gaps:
                             review_warning += f"\n*Missing: {', '.join(gaps[:2])}*"
 
-                    msg.content = f"🔍 **Research complete** {conf_badge}\n\n{answer_text}{review_warning}"
+                    msg.content = f"{cards_markdown}🔍 **Research complete** {conf_badge}\n\n{answer_text}{review_warning}"
                 
                 await msg.update()
 
@@ -194,3 +206,43 @@ def _confidence_badge(confidence: int | None) -> str:
         return f"🟡 `{confidence}% confidence`"
     else:
         return f"🔴 `{confidence}% confidence`"
+
+
+def format_card_for_chainlit(card: dict) -> str:
+    card_type = card.get("type", "product").upper()
+    title = card.get("title", "")
+    img = card.get("image", "")
+    desc = card.get("description", "")
+    price = card.get("price", "")
+    rating = card.get("rating", "")
+    brand = card.get("brand", "")
+    official_url = card.get("official_url", "")
+    ext_links = card.get("external_links", [])
+    
+    lines = []
+    lines.append(f"### 🏷️ {card_type}: {title}")
+    if img:
+        lines.append(f"![{title}]({img})")
+        
+    meta = []
+    if brand:
+        meta.append(f"**Brand:** {brand}")
+    if rating:
+        meta.append(f"**Rating:** ★ {rating}")
+    if price:
+        meta.append(f"**Price:** {price}")
+    if meta:
+        lines.append(" | ".join(meta))
+        
+    if desc:
+        lines.append(f"\n*{desc}*\n")
+        
+    links = []
+    if official_url:
+        links.append(f"[Official Site]({official_url})")
+    for link in ext_links:
+        links.append(f"[{link['label']}]({link['url']})")
+    if links:
+        lines.append(" • ".join(links))
+        
+    return "\n".join(lines)
