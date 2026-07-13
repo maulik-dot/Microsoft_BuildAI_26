@@ -1,5 +1,5 @@
 """
-General-purpose web research agent — fully capable version.
+General-purpose browser agent — fully capable version.
 Handles all 10 core capabilities:
 1. Goal Understanding     — ambiguity detection + clarifying questions
 2. Browser Perception     — via browser-use + augmented system context
@@ -13,9 +13,10 @@ Handles all 10 core capabilities:
 10. Reporting Back        — confidence score, needs_review flag, gap list
 """
 
+import asyncio
 import time
 from backend.tools.browser import run_deep_task
-from backend.tools.planner import plan_research, replan
+from backend.tools.planner import plan_research_async, replan
 from backend.tools.step_tracker import StepTracker, TaskScratchpad, parse_plan_steps
 from backend.tools.goal_interpreter import interpret
 from backend.tools.verifier import verify
@@ -27,13 +28,21 @@ MAX_RETRIES = 1
 
 async def run_research(query: str, task_id: str = "") -> dict:
     """
-    Full research pipeline with all 10 capabilities wired in.
+    Full browser-agent pipeline with all 10 capabilities wired in.
     Returns a dict with: query, result, confidence, needs_review, gaps,
     and optionally: status="waiting_user", clarifying_question.
     """
 
-    # ── 1. GOAL UNDERSTANDING ──────────────────────────────────────────────
-    goal = interpret(query)
+    # ── 1+2. GOAL UNDERSTANDING + PLANNING (concurrent) ─────────────────────
+    # interpret() and the planning phase are independent analyses of the query, so
+    # we run them together instead of serially. If the query turns out ambiguous we
+    # discard the plan and ask the user. Planning runs on the raw query; the query
+    # engineer does its own temporal/year handling, and the browser still receives
+    # the refined query as its primary directive below.
+    goal, plan_text = await asyncio.gather(
+        asyncio.to_thread(interpret, query),
+        plan_research_async(query),
+    )
 
     if goal["is_ambiguous"]:
         return {
@@ -50,9 +59,8 @@ async def run_research(query: str, task_id: str = "") -> dict:
     success_condition = goal["success_condition"]
     temporal_intent = goal.get("temporal_intent", False)
 
-    # ── 2. PLANNING & STATE ────────────────────────────────────────────────
+    # ── STATE ──────────────────────────────────────────────────────────────
     memory_ctx = get_general_context(refined_query)
-    plan_text = plan_research(refined_query)
     steps = parse_plan_steps(plan_text)
     tracker = StepTracker(steps)
     scratchpad = TaskScratchpad()
@@ -69,8 +77,10 @@ async def run_research(query: str, task_id: str = "") -> dict:
 
         task = _build_task(refined_query, memory_ctx, current_plan, scratchpad, success_condition, temporal_intent)
 
-        # Fewer steps on retries — more focused
-        max_steps = 30 if attempt == 0 else 18
+        # Step cap per attempt. Each step is a vision LLM round-trip, so this bounds
+        # worst-case latency; successful queries finish well under it, and verify()
+        # gives a focused second attempt. Retries run tighter.
+        max_steps = 20 if attempt == 0 else 14
 
         # ── 4. BROWSER EXECUTION ──────────────────────────────────────────
         browser_model = get_model_for_tier(ModelTier.LARGE)
@@ -128,12 +138,13 @@ SUCCESS CONDITION: {success_condition}
 
 RESEARCH INSTRUCTIONS:
 1. Start at https://www.google.com — search for the most relevant query
-2. Open the top 3-5 most relevant results
+2. Open the top 3-5 most relevant results. CRITICAL: You MUST actually navigate to the retailer/source sites (like Flipkart, Amazon, Myntra, AJIO, etc.) to perform the searches and extract the details. Do NOT just read the snippets on the Google search results page.
 3. Extract thorough, accurate information from each page:
    - For specific products or listings (e.g., jobs, hotels, flights), you MUST extract the direct purchase/listing page link and primary image URL.
    - If searching e-commerce sites (like Amazon, Flipkart, Myntra), you can reliably and instantly extract the products, prices, direct href links, and image source URLs by running a JavaScript query with the 'evaluate' tool on the search results page:
-     * Amazon: `Array.from(document.querySelectorAll('[data-component-type="s-search-result"]')).map(el => { const a = el.querySelector('h2 a'); const img = el.querySelector('.s-image'); const p = el.querySelector('.a-price-whole'); return {name: a?.innerText, url: a?.href, price: p?.innerText, image: img?.src}; }).filter(x => x.name && x.url)`
-     * Flipkart: `Array.from(document.querySelectorAll('div[data-id]')).map(el => { const a = el.querySelector('a'); const img = el.querySelector('img'); const p = el.querySelector('div._30jeq3, div._1vC4Qe'); return {name: a?.innerText || a?.title, url: a?.href, price: p?.innerText, image: img?.src}; }).filter(x => x.name && x.url)`
+     * Amazon: `Array.from(document.querySelectorAll('[data-component-type="s-search-result"]')).map(el => {{ const a = el.querySelector('h2 a'); const img = el.querySelector('.s-image'); const p = el.querySelector('.a-price-whole'); return {{name: a?.innerText, url: a?.href, price: p?.innerText, image: img?.src}}; }}).filter(x => x.name && x.url)`
+     * Flipkart: `Array.from(document.querySelectorAll('div[data-id]')).map(el => {{ const a = el.querySelector('a'); const img = el.querySelector('img'); const p = el.querySelector('div._30jeq3, div._1vC4Qe'); return {{name: a?.innerText || a?.title, url: a?.href, price: p?.innerText, image: img?.src}}; }}).filter(x => x.name && x.url)`
+   - Writing 'Not available on search results page' or 'Not found' or using generic store homepages for direct links and image URLs is a direct failure. You MUST get the real product links and image source URLs!
    - If not on a search results page, navigate to details pages to capture the direct links (from address bar) and image src URLs.
    - Do NOT use generic homepage links (like amazon.in).
 4. Cross-reference across sources for accuracy

@@ -47,7 +47,7 @@ def verify(query: str, result: str, success_condition: str) -> dict:
             "retry_hint": "Sites may be blocking access — try Google search approach instead of direct navigation",
         }
 
-    prompt = f"""You are a quality evaluator for a web research agent.
+    prompt = f"""You are a quality evaluator for a browser agent.
 
 ORIGINAL QUERY: {query}
 

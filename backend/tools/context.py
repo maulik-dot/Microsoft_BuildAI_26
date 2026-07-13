@@ -16,7 +16,7 @@ from backend.memory.agent_memory import _load as load_memory, _load_general
 # ── CORE SYSTEM PROMPT ─────────────────────────────────────────────────────
 
 AGENT_SYSTEM_PROMPT = """## YOUR ROLE
-You are an expert web research agent. You browse the web with the precision of a senior software engineer and the patience of a professional researcher. You never guess — you observe, plan, act, verify, and adapt.
+You are an expert browser agent. You browse the web with the precision of a senior software engineer and the patience of a professional researcher. You never guess — you observe, plan, act, verify, and adapt.
 
 ---
 
@@ -265,47 +265,32 @@ def get_system_context(task_type: str = "", temporal: bool = False, task: str = 
 
 
 def _build_memory_block(task_type: str, query: str = "") -> str:
-    """Build a memory context block from what the agent has learned."""
+    """Build a compact memory context block from what the agent has learned."""
     lines = []
 
-    # Map query keywords to historical task types to retrieve specific learned context
-    detected_types = []
-    if query:
-        q = query.lower()
-        if any(w in q for w in ["flight", "hotel", "travel", "trip", "ixigo"]):
-            detected_types.append("travel")
-        if any(w in q for w in ["job", "career", "hiring", "vacancy", "naukri"]):
-            detected_types.append("jobs")
-        if any(w in q for w in ["hackathon", "devfolio", "unstop", "contest"]):
-            detected_types.append("hackathon")
-        if any(w in q for w in ["price", "flipkart", "amazon", "deal", "buy", "compare"]):
-            detected_types.append("price_monitor")
-
-    if task_type and task_type not in ("research", ""):
-        detected_types.append(task_type)
-
-    # Remove duplicates but keep order
-    seen = set()
-    detected_types = [x for x in detected_types if not (x in seen or seen.add(x))]
-
-    # Task-specific memory
     memory = load_memory()
-    for dtype in detected_types:
-        m = memory.get(dtype, {})
-        if m.get("works"):
-            lines.append(f"## LEARNED: Sites that work for {dtype}")
-            for s in m["works"][:4]:
-                lines.append(f"  ✅ {s}")
-        if m.get("blocked"):
-            lines.append(f"## LEARNED: Sites to skip for {dtype}")
-            for s in m["blocked"][:4]:
-                lines.append(f"  ❌ {s}")
-        if m.get("tips"):
-            lines.append(f"## LEARNED: Tips for {dtype}")
-            for t in m["tips"][:3]:
-                lines.append(f"  💡 {t}")
+    bucket = memory.get(task_type) or memory.get("research", {})
 
-    # General memory — top sources across all research
+    if bucket.get("works"):
+        lines.append("## LEARNED: Sites that have worked")
+        for s in bucket["works"][:5]:
+            lines.append(f"  ✅ {s}")
+    if bucket.get("blocked"):
+        lines.append("## LEARNED: Sites to avoid")
+        for s in bucket["blocked"][:5]:
+            lines.append(f"  ❌ {s}")
+    if bucket.get("tips"):
+        lines.append("## LEARNED: Practical tips")
+        for t in bucket["tips"][:5]:
+            lines.append(f"  💡 {t}")
+
+    if bucket.get("page_flows"):
+        lines.append("## LEARNED: Example page flows")
+        for flow in bucket["page_flows"][:3]:
+            if isinstance(flow, dict):
+                lines.append(f"  → {flow.get('summary', flow)}")
+
+    # General memory — top sources across all browser runs
     general = _load_general()
     top_sources = sorted(
         general.get("successful_sources", {}).items(),
@@ -314,11 +299,11 @@ def _build_memory_block(task_type: str, query: str = "") -> str:
     blocked = general.get("blocked_sites", [])
 
     if top_sources:
-        lines.append("## LEARNED: Most reliable sources from past research")
+        lines.append("## LEARNED: Most reliable sources from past browser runs")
         for domain, count in top_sources:
             lines.append(f"  ✅ {domain} ({count} successful uses)")
     if blocked:
-        lines.append("## LEARNED: Sites that blocked past research attempts")
+        lines.append("## LEARNED: Sites that blocked past browser attempts")
         for s in blocked[:5]:
             lines.append(f"  ❌ {s}")
 

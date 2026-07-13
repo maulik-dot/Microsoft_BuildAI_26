@@ -24,8 +24,8 @@ pymupdf>=1.24.0
 sqlalchemy>=2.0.0
 aiosqlite>=0.21.0
 
-# Frontend
-chainlit>=2.11.1
+# Frontend: served as a static single-page app (frontend/index.html) via FastAPI —
+# no separate UI framework required.
 
 # Utilities
 httpx>=0.27.0

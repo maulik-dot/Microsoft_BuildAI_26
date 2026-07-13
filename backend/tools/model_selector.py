@@ -3,15 +3,16 @@ Model Router — two-tier selection with eval tracking.
 
 Principles:
 1. Establish performance baseline via evals (tracked in model_evals.json)
-2. Use best models for accuracy-critical tasks (browser agent, complex research)
+2. Use best models for accuracy-critical tasks (browser agent, complex browsing)
 3. Optimize cost/latency by routing simple tasks to smaller models
 4. Never prematurely limit — always fall back to larger model if small one fails
 
 Tiers:
   SMALL — fast, cheap: planning, parsing, verification, clarifying questions
-  LARGE — best available: browser agent, multi-step reasoning, deep research
+  LARGE — best available: browser agent, multi-step reasoning, deep browsing
 """
 
+import asyncio
 import httpx
 import time
 import json
@@ -22,13 +23,21 @@ from enum import Enum
 
 class ModelTier(str, Enum):
     SMALL = "small"   # Planning, parsing, verification, classification
-    LARGE = "large"   # Browser automation, complex multi-step research
+    LARGE = "large"   # Browser automation, complex multi-step browsing
+
+# Model names decide the provider (see llm_client): bare = Gemini (direct key),
+# "provider/model" = OpenRouter. OpenRouter models are listed LAST in each tier so
+# they're only reached once the direct-key Gemini models are all cooling down (429).
+# Every model here must be vision-capable — both tiers can drive the screenshot agent.
 
 # Small = fast + cheap. Sufficient for structured tasks with clear inputs.
 SMALL_MODELS = [
     "gemini-3.1-flash-lite",     # 500 req/day free — primary small model
     "gemini-flash-lite-latest",  # alias fallback
     "gemini-2.0-flash-lite",     # secondary small fallback
+    # ── OpenRouter fallbacks (separate quota pool) ──
+    "openai/gpt-4o-mini",            # cheap, reliable, vision + structured output
+    "google/gemini-2.5-flash-lite",  # Gemini via OpenRouter — dodges direct-key 429
 ]
 
 # Large = most capable available. Used when reasoning quality matters.
@@ -37,6 +46,9 @@ LARGE_MODELS = [
     "gemini-2.5-flash",          # Best reasoning when available
     "gemini-3.5-flash",          # Only 5 req/min on some keys — fallback
     "gemini-2.0-flash",          # Additional fallback
+    # ── OpenRouter fallbacks (separate quota pool) ──
+    "openai/gpt-4o",             # strong vision agent model
+    "google/gemini-2.5-flash",   # Gemini via OpenRouter — dodges direct-key 429
 ]
 
 # Task → Tier routing table
@@ -55,65 +67,149 @@ TASK_TIER_MAP = {
     "cross_service":      ModelTier.LARGE,
 }
 
-# ── Cache ─────────────────────────────────────────────────────────────────────
+# ── Reactive availability (no per-request network probes) ─────────────────────
+#
+# The previous design ran a BLOCKING httpx probe (5s timeout, sequential) against
+# Google's generateContent endpoint on every cache miss — on the request hot path,
+# in an async server, once per tier every 5 minutes. Worse, each probe spent a real
+# generateContent call just to say "hi", burning scarce quota (gemini-2.5-flash is
+# ~20 req/day). We removed that entirely:
+#
+#   • get_model* are now instant and non-blocking — they return the startup-resolved
+#     model for a tier, or the primary, skipping any model on cooldown.
+#   • resolve_models() does ONE parallel async probe at startup (off the hot path).
+#   • real call failures feed back via note_error() → a short cooldown, so an
+#     exhausted (429) or nonexistent (404) model is skipped without re-probing.
 
-_cache: dict[str, tuple[str, float]] = {}  # tier -> (model, timestamp)
-CACHE_TTL = 300  # 5 minutes
+_resolved: dict[ModelTier, str] = {}   # tier -> validated working model (set at startup)
+_cooldown: dict[str, float] = {}       # model -> unix ts when it may be retried
+
+EXHAUSTED_COOLDOWN = 900    # 429 / rate limit → retry in 15 min
+UNAVAILABLE_COOLDOWN = 3600  # 404 / unknown model → retry in 1 hour
+
+
+def _available(model: str) -> bool:
+    ts = _cooldown.get(model)
+    return ts is None or time.time() >= ts
+
+
+def mark_exhausted(model: str):
+    """Model hit a rate/quota limit (429) — skip it for a while."""
+    _cooldown[model] = time.time() + EXHAUSTED_COOLDOWN
+    print(f"[ModelRouter] {model} exhausted → cooldown {EXHAUSTED_COOLDOWN}s")
+
+
+def mark_unavailable(model: str):
+    """Model not found / unusable on this key (404) — skip it longer."""
+    _cooldown[model] = time.time() + UNAVAILABLE_COOLDOWN
+    print(f"[ModelRouter] {model} unavailable → cooldown {UNAVAILABLE_COOLDOWN}s")
+
+
+def note_error(model: str, err) -> None:
+    """Classify a real LLM call error and cool the model down accordingly."""
+    msg = str(err).lower()
+    if any(s in msg for s in ("429", "resource_exhausted", "rate limit", "quota")):
+        mark_exhausted(model)
+        # A resolved model that just got exhausted should be re-picked next call.
+        _drop_resolved(model)
+    elif any(s in msg for s in ("404", "not_found", "not found", "unsupported", "is not found")):
+        mark_unavailable(model)
+        _drop_resolved(model)
+
+
+def _drop_resolved(model: str):
+    for tier, m in list(_resolved.items()):
+        if m == model:
+            _resolved.pop(tier, None)
+
+
+def candidates(task_type: str = "browser_agent") -> list[str]:
+    """Ordered models to try for a task, resolved-first, skipping cooled-down ones."""
+    tier = TASK_TIER_MAP.get(task_type, ModelTier.LARGE)
+    models = SMALL_MODELS if tier == ModelTier.SMALL else LARGE_MODELS
+    ordered = ([_resolved[tier]] if tier in _resolved else []) + \
+              [m for m in models if m != _resolved.get(tier)]
+    live = [m for m in ordered if _available(m)]
+    return live or models[:1]  # if everything is cooling down, best-effort try the primary
 
 
 def get_model(task_type: str = "browser_agent") -> str:
-    """Return the best available model for a given task type."""
-    tier = TASK_TIER_MAP.get(task_type, ModelTier.LARGE)
-    return get_model_for_tier(tier)
+    """Best available model for a task type — instant, no network probe."""
+    return candidates(task_type)[0]
 
 
 def get_model_for_tier(tier: ModelTier) -> str:
-    """Return the best working model for a tier, with caching."""
-    global _cache
-
-    # Check cache
-    if tier in _cache:
-        model, ts = _cache[tier]
-        if time.time() - ts < CACHE_TTL:
-            return model
-
-    from backend.config import settings
-    key = settings.google_api_key
-
+    """Best available model for a tier — instant, no network probe."""
+    if tier in _resolved and _available(_resolved[tier]):
+        return _resolved[tier]
     models = SMALL_MODELS if tier == ModelTier.SMALL else LARGE_MODELS
-
-    for model in models:
-        try:
-            r = httpx.post(
-                f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={key}",
-                json={"contents": [{"parts": [{"text": "hi"}]}]},
-                timeout=5,
-            )
-            if "candidates" in r.json():
-                _cache[tier] = (model, time.time())
-                print(f"[ModelRouter] {tier.value.upper()} → {model}")
-                return model
-        except Exception:
-            continue
-
-    # All exhausted — return the cheapest model anyway
-    fallback = SMALL_MODELS[0]
-    print(f"[ModelRouter] WARNING: all {tier.value} models exhausted, using {fallback}")
-    return fallback
+    for m in models:
+        if _available(m):
+            return m
+    return models[0]
 
 
 def invalidate(tier: ModelTier | None = None):
-    """Invalidate cache for a tier (or all tiers) after a 429."""
-    global _cache
-    if tier:
-        _cache.pop(tier, None)
+    """Clear cooldowns + resolved cache (e.g. after quota reset). Tier kept for compat."""
+    if tier is not None:
+        _resolved.pop(tier, None)
     else:
-        _cache.clear()
+        _resolved.clear()
+    _cooldown.clear()
 
 
-# Backward-compatible alias used by browser.py
+# Backward-compatible alias used by resume_parser.py
 def get_working_model() -> str:
     return get_model_for_tier(ModelTier.LARGE)
+
+
+async def resolve_models() -> None:
+    """
+    One-time startup probe (both tiers in parallel) that validates the best working
+    model per tier and caches it, so the request hot path never makes a network probe.
+    Non-fatal: if it fails or the key is missing, hot-path calls fall back to the
+    optimistic primary + reactive cooldown.
+    """
+    from backend.config import settings
+    key = settings.google_api_key
+    if not key:
+        return
+
+    async def probe_tier(tier: ModelTier, models: list[str]):
+        async with httpx.AsyncClient(timeout=6) as client:
+            for m in models:
+                # OpenRouter models ("provider/model") aren't reachable via Google's
+                # endpoint — never probe them (that would 404 → 1h cooldown and kill
+                # the fallback). They stay reactive: used only once Gemini cools down.
+                if "/" in m:
+                    continue
+                if not _available(m):
+                    continue
+                try:
+                    r = await client.post(
+                        f"https://generativelanguage.googleapis.com/v1beta/models/{m}:generateContent?key={key}",
+                        json={"contents": [{"parts": [{"text": "hi"}]}]},
+                    )
+                    d = r.json()
+                    if "candidates" in d:
+                        _resolved[tier] = m
+                        print(f"[ModelRouter] {tier.value.upper()} → {m}")
+                        return
+                    code = d.get("error", {}).get("code")
+                    if code == 429:
+                        mark_exhausted(m)  # exists but exhausted — keep looking for a fresh one
+                    elif code == 404:
+                        mark_unavailable(m)
+                except Exception:
+                    continue
+
+    try:
+        await asyncio.gather(
+            probe_tier(ModelTier.SMALL, SMALL_MODELS),
+            probe_tier(ModelTier.LARGE, LARGE_MODELS),
+        )
+    except Exception as e:
+        print(f"[ModelRouter] resolve_models failed (using optimistic defaults): {e}")
 
 
 # ── Eval Tracker ──────────────────────────────────────────────────────────────

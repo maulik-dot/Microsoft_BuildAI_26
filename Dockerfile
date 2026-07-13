@@ -32,13 +32,13 @@ RUN mkdir -p uploads /tmp/vayu
 # Copy supervisor config
 COPY supervisord.conf /etc/supervisor/conf.d/vayu.conf
 
-# Railway sets PORT env var — default to 8001 for Chainlit
-ENV PORT=8001
+# Railway sets PORT env var — default to 8000 for FastAPI
+ENV PORT=8000
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1
 # Run browser in headless mode on cloud
 ENV DISPLAY=""
 
-EXPOSE 8000 8001
+EXPOSE 8000
 
 CMD ["/usr/bin/supervisord", "-n", "-c", "/etc/supervisor/conf.d/vayu.conf"]

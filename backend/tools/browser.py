@@ -6,6 +6,9 @@ from backend.config import settings
 
 _browser: Browser | None = None
 _browser_lock = asyncio.Lock()
+# Exclusive-use lock: only one agent may drive the shared warm browser at a time.
+# A second, concurrent task falls back to its own isolated fresh browser.
+_warm_in_use = asyncio.Lock()
 
 # Step log store: task_id -> list of step dicts
 _step_logs: dict[str, list[dict]] = {}
@@ -13,11 +16,10 @@ _step_logs: dict[str, list[dict]] = {}
 
 def get_llm():
     from backend.tools.model_selector import get_model_for_tier, ModelTier
-    return ChatGoogle(
-        model=get_model_for_tier(ModelTier.LARGE),
-        api_key=settings.google_api_key,
-        temperature=0,
-    )
+    from backend.tools.llm_client import make_browser_llm
+    # LARGE tier — resolves to a Gemini model normally, or an OpenRouter model
+    # (openai/gpt-4o, google/gemini-2.5-flash) once the direct key is exhausted.
+    return make_browser_llm(get_model_for_tier(ModelTier.LARGE))
 
 
 def _make_browser(keep_alive: bool = True) -> Browser:
@@ -92,13 +94,12 @@ def _make_agent(task: str, browser: Browser, task_type: str = "",
         except Exception:
             pass
 
-    # Fallback LLM — always gemini-3.1-flash-lite (highest rate limit)
-    from browser_use.llm.google.chat import ChatGoogle as _ChatGoogle
-    fallback_llm = _ChatGoogle(
-        model="gemini-3.1-flash-lite",
-        api_key=settings.google_api_key,
-        temperature=0,
-    )
+    # Fallback LLM — the resolved SMALL model (validated at startup, highest rate
+    # limit). Provider-aware: falls through to OpenRouter (openai/gpt-4o-mini,
+    # google/gemini-2.5-flash-lite) if the direct-key Gemini models are cooling down.
+    from backend.tools.model_selector import get_model_for_tier as _get_tier, ModelTier as _Tier
+    from backend.tools.llm_client import make_browser_llm as _make_llm
+    fallback_llm = _make_llm(_get_tier(_Tier.SMALL))
 
     return Agent(
         task=task,
@@ -106,13 +107,15 @@ def _make_agent(task: str, browser: Browser, task_type: str = "",
         fallback_llm=fallback_llm,
         browser=browser,
 
-        # ── Timeouts ──
-        llm_timeout=60,
-        step_timeout=120,
+        # ── Timeouts ── (flash models answer in seconds; high ceilings just delay
+        # failover to fallback_llm on a hang)
+        llm_timeout=30,
+        step_timeout=90,
 
-        # ── Principle 2: Smarter Planning ──
-        enable_planning=True,          # Agent writes plan before acting
-        planning_replan_on_stall=3,    # Replan after 3 steps without progress
+        # ── Planning ── We inject our own detailed plan via plan_research(), so
+        # browser-use's internal planner is redundant. Disabling it removes the plan
+        # fields from every step's output schema (fewer tokens generated per step).
+        enable_planning=False,
 
         # ── Principle 5: Recovery Loop ──
         loop_detection_enabled=True,
@@ -120,8 +123,10 @@ def _make_agent(task: str, browser: Browser, task_type: str = "",
         max_failures=4,                # Stop after 4 consecutive failures
         final_response_after_failure=True,  # Always return something, never empty
 
-        # ── Principle 6: Self-Verification ──
-        use_judge=True,                # LLM judges if task was actually completed
+        # ── Verification ── The pipeline's verify() does the real result-quality
+        # gating + retry. browser-use's use_judge is a telemetry-only LLM call at the
+        # end of each run (it does NOT override the result), so it's pure overhead.
+        use_judge=False,
 
         # ── Principle 1 + 7: Better Observation + CoT ──
         use_vision=True,               # Screenshot + DOM together
@@ -232,37 +237,85 @@ async def run_browser_task(task: str, task_type: str = "", task_id: str = "",
     return result
 
 
-async def run_deep_task(task: str, task_type: str = "", task_id: str = "",
-                        temporal: bool = False, max_steps: int = 35,
-                        original_query: str = "") -> str:
+async def _rebuild_warm_browser() -> Browser:
+    """Replace the shared warm browser with a fresh one after a broken session."""
     global _browser
+    async with _browser_lock:
+        if _browser is not None:
+            try:
+                await _browser.kill()
+            except Exception:
+                pass
+        _browser = _make_browser(keep_alive=True)
+        return _browser
+
+
+async def _run_agent_once(task: str, browser: Browser, task_type: str, task_id: str,
+                          temporal: bool, learned_ctx: str, max_steps: int) -> str:
+    agent = _make_agent(task, browser, task_type, task_id, temporal, learned_ctx)
+    history = await agent.run(max_steps=max_steps)
+    return _extract_best_result(history)
+
+
+async def run_deep_task(task: str, task_type: str = "", task_id: str = "",
+                        temporal: bool = False, max_steps: int = 24,
+                        original_query: str = "") -> str:
+    """
+    Run one browsing task, reusing the warm (already-launched) browser when it is
+    free — the shared Chromium stays alive between queries (keep_alive=True), so
+    only the very first query pays a cold start. The browser-use event bus
+    self-heals on the next agent.run() → session.start().
+
+    Concurrency: /browse tasks can overlap. Only one agent may drive the shared
+    browser at a time, so if the warm browser is busy we transparently fall back
+    to an isolated fresh browser for this task.
+    """
     from backend.tools.learner import get_learned_context, learn_from_run
 
     learned_ctx = get_learned_context(original_query or task)
 
-    # Always create a fresh browser for each task.
-    # The warm browser's internal session gets reset after each run,
-    # which leaves it in a state that breaks the next agent.
-    # Pre-warm at startup handles cold-start for the first query;
-    # subsequent tasks get a clean browser quickly since the OS has Chromium cached.
-    browser = _make_browser(keep_alive=False)
+    # Try to claim the warm browser without blocking a concurrent task for long.
+    got_warm = False
     try:
-        agent = _make_agent(task, browser, task_type, task_id, temporal, learned_ctx)
-        history = await agent.run(max_steps=max_steps)
-        result = _extract_best_result(history)
-    finally:
-        try:
-            await browser.close()
-        except Exception:
-            pass
-        # Refresh the warm browser for the next task
-        async with _browser_lock:
-            if _browser:
+        await asyncio.wait_for(_warm_in_use.acquire(), timeout=0.05)
+        got_warm = True
+    except (asyncio.TimeoutError, Exception):
+        got_warm = False
+
+    result = ""
+    try:
+        if got_warm:
+            browser = await get_browser()
+            try:
+                result = await _run_agent_once(task, browser, task_type, task_id,
+                                               temporal, learned_ctx, max_steps)
+            except Exception as e:
+                # Warm session broke — rebuild it and retry once on a fresh browser.
+                print(f"[Vayu] Warm browser run failed ({e}); rebuilding, retrying on fresh browser")
+                await _rebuild_warm_browser()
+                fresh = _make_browser(keep_alive=False)
                 try:
-                    await _browser.close()
+                    result = await _run_agent_once(task, fresh, task_type, task_id,
+                                                   temporal, learned_ctx, max_steps)
+                finally:
+                    try:
+                        await fresh.kill()
+                    except Exception:
+                        pass
+        else:
+            # Warm browser busy with a concurrent task — use an isolated fresh browser.
+            fresh = _make_browser(keep_alive=False)
+            try:
+                result = await _run_agent_once(task, fresh, task_type, task_id,
+                                               temporal, learned_ctx, max_steps)
+            finally:
+                try:
+                    await fresh.kill()
                 except Exception:
                     pass
-            _browser = _make_browser(keep_alive=True)
+    finally:
+        if got_warm:
+            _warm_in_use.release()
 
     steps = _step_logs.get(task_id, [])
     learn_from_run(original_query or task, steps, result, success=bool(result and len(result) > 20))

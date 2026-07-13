@@ -7,6 +7,7 @@ class Settings(BaseSettings):
     google_api_key: str = ""
     groq_api_key: str = ""
     openai_api_key: str = ""
+    openrouter_api_key: str = ""
     browser_use_api_key: str = ""
     app_env: str = "development"
     log_level: str = "INFO"

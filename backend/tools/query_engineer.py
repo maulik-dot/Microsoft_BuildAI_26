@@ -10,6 +10,7 @@ Applies 6 techniques automatically:
 6. Source targeting      (best sites per query type)
 """
 
+import asyncio
 import re
 from datetime import datetime
 from backend.tools.planner import _call_llm
@@ -216,19 +217,29 @@ Return only the search query:""", task_type="planning")
     return search.strip().strip('"') if search else ""
 
 
+async def generate_hypothetical_async(query: str) -> str:
+    """Async wrapper so the 2-call HyDE chain can overlap other planning LLM calls."""
+    return await asyncio.to_thread(generate_hypothetical, query)
+
+
 # ── Full enhanced plan ────────────────────────────────────────────────────────
 
-def engineer_search_plan(query: str) -> str:
+def engineer_search_plan(query: str, hypothetical: str | None = None) -> str:
     """
     Build a complete engineered search plan for the agent.
     Returns a block of text to prepend to the task prompt.
+
+    hypothetical: pass a precomputed HyDE string (or "" to skip it) to keep this
+    function LLM-free so callers can parallelize the HyDE call. Default None keeps
+    the original behaviour and computes it inline.
     """
     year = datetime.now().year
     temporal = _detect_temporal(query)
     intents = _detect_intent(query)
     operator_queries = build_operator_queries(query)
     angles = generate_angles(query)
-    hypothetical = generate_hypothetical(query)
+    if hypothetical is None:
+        hypothetical = generate_hypothetical(query)
 
     lines = ["## ENGINEERED SEARCH STRATEGY\n"]
 

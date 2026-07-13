@@ -22,7 +22,7 @@ def interpret(query: str) -> dict:
     CURRENT_YEAR = str(now.year)
     CURRENT_DATE = now.strftime("%B %d, %Y")  # e.g. "June 05, 2026"
 
-    prompt = f"""You are a query analyst for a web research agent. Today's date is {CURRENT_DATE}.
+    prompt = f"""You are a query analyst for a browser agent. Today's date is {CURRENT_DATE}.
 
 Analyse this user query and return JSON with exactly these fields:
 

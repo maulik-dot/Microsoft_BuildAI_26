@@ -1,13 +1,8 @@
 """
 Task Router — self-learning, zero hardcoded site lists.
 
-Routes queries to the most appropriate agent based on query intent.
-The agents themselves discover and learn which sites work — no pre-programmed lists.
-
-Routing logic:
-- comparison  → Universal comparison agent (Google discovers sources, memory refines over time)
-- travel      → Travel crew (structured flight+hotel itinerary)
-- research    → General research agent
+Routes queries to either chit-chat or the universal browser agent.
+The browser agent discovers and learns which sites and flows work — no pre-programmed lists.
 """
 
 import json
@@ -15,7 +10,7 @@ from backend.tools.planner import _call_llm
 
 
 def classify(query: str, context: list = None) -> str:
-    """Classify the query into either comparison, research, or chit_chat."""
+    """Classify the query into either browser_agent or chit_chat."""
     from datetime import datetime
     today = datetime.now().strftime("%B %d, %Y")
 
@@ -32,17 +27,16 @@ Today's date: {today}
 
 {history_str}User Query: "{query}"
 
-Categories:
-- comparison: user wants a direct price comparison, deals, cheapest option across multiple stores, or comparing specific options/products. Key signals: "compare", "cheapest", "vs", "under ₹X", "best deal".
 - chit_chat: casual messages, greetings, pleasantries, compliments, thanks, simple conversational replies, personal questions (like name, identity, feelings), or chat that does not require web search. Key signals: "hi", "hello", "hey", "thanks", "thank you", "arigato", "good job", "great", "nice", "bye", "what is my name", "who are you".
-- research: EVERYTHING ELSE — general questions, finding information, lists of jobs, flights, hotel details, hackathons, facts, specs, tutorials, YouTube search, programming queries.
 
-Return only: comparison | research | chit_chat"""
+- browser_agent: EVERYTHING ELSE — any query that benefits from live web browsing, source discovery, comparison, extraction, or verification.
+
+Return only: browser_agent | chit_chat"""
 
     result = _call_llm(prompt, task_type="planning")
-    result = result.strip().lower().split()[0] if result else "research"
-    valid = {"comparison", "research", "chit_chat"}
-    return result if result in valid else "research"
+    result = result.strip().lower().split()[0] if result else "browser_agent"
+    valid = {"browser_agent", "chit_chat"}
+    return result if result in valid else "browser_agent"
 
 
 async def route(query: str, task_id: str = "", context: list = None) -> dict:
@@ -58,7 +52,7 @@ async def route(query: str, task_id: str = "", context: list = None) -> dict:
             ) + "\n"
 
         # Reply directly without browser
-        reply = _call_llm(f"""You are Vayu, a friendly and helpful autonomous web research agent. 
+        reply = _call_llm(f"""You are Vayu, a friendly and helpful autonomous browser agent. 
 Reply politely and concisely to the user's message, keeping the conversation history in mind. Stay in character.
 
 CONVERSATION HISTORY:
@@ -76,12 +70,8 @@ Return only your direct reply.""", task_type="planning")
             "status": "completed"
         }
 
-    elif task_type == "comparison":
-        from backend.agents.comparison.crew import run_comparison
-        res = await run_comparison(query, task_id=task_id)
-    else:
-        from backend.agents.research.agent import run_research
-        res = await run_research(query, task_id=task_id)
+    from backend.agents.research.agent import run_research
+    res = await run_research(query, task_id=task_id)
 
     from backend.tools.rich_cards import enrich_response
     return await enrich_response(query, res)

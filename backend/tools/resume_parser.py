@@ -39,13 +39,11 @@ Return only valid JSON, no markdown."""
         except Exception:
             pass
 
-    # Fall back to Gemini
-    if not raw and settings.google_api_key:
-        from google import genai
+    # Fall back to the router's best model (Gemini, or OpenRouter once exhausted)
+    if not raw and (settings.google_api_key or settings.openrouter_api_key):
         from backend.tools.model_selector import get_working_model
-        client = genai.Client(api_key=settings.google_api_key)
-        r = client.models.generate_content(model=get_working_model(), contents=prompt)
-        raw = r.text.strip()
+        from backend.tools.llm_client import complete_text
+        raw = complete_text(get_working_model(), prompt)
 
     if raw.startswith("```"):
         raw = raw.split("```")[1]

@@ -47,7 +47,7 @@ def _parse_json(raw: str):
 
 async def detect_entities(query: str, result_text: str) -> list[dict]:
     """Use LLM to detect if query/result mentions products, places, media, or profiles."""
-    prompt = f"""You are an entity detector. Read the query and the research snippet.
+    prompt = f"""You are an entity detector. Read the query and the browser snippet.
 Identify if the user is asking about or the result describes specific, identifiable entities (e.g., a product, place, movie, book, person, landmark, gadget).
 If yes, return a JSON list of objects, each representing an entity to enrich.
 
@@ -93,7 +93,7 @@ async def extract_llm_details_batch(entities: list[dict], result_text: str) -> d
     if not entities:
         return {}
         
-    prompt = f"""You are a structured data extractor. You are given a list of entities and a markdown research report containing information about them.
+    prompt = f"""You are a structured data extractor. You are given a list of entities and a markdown browser report containing information about them.
     
 ENTITIES TO EXTRACT:
 {json.dumps(entities, indent=2)}
@@ -155,6 +155,54 @@ def _extract_image_from_text(entity_name: str, text: str) -> str:
         return matches[0]
     return ""
 
+async def clean_result_text(query: str, result_text: str, cards: list[dict]) -> str:
+    """Clean the raw browser text by removing ugly raw lists/URLs that are already rendered as cards."""
+    # Serialize cards for the LLM
+    cards_json = json.dumps(cards, indent=2)
+
+    prompt = f"""You are a professional, senior copywriter for Vayu, an AI browser assistant.
+We have just completed a web search and extracted/validated structured entity cards for these products/entities:
+{cards_json}
+
+The user's original query was: "{query}"
+
+Here is the raw browser report containing notes about the search session:
+---
+{result_text}
+---
+
+Your task:
+Rewrite the browser report into a clean, professional summary that will be displayed BELOW the image and link cards.
+Generate a response in this EXACT format (do not repeat the product images or specifications, as they are already displayed in the cards above):
+
+1. Introduction:
+   - A friendly message starting with: "I have successfully searched for [Query] on [Sources]. Below is the comparison of the best options found." (E.g. "I have successfully searched for Nike shoes under 3000 rupees on both Amazon.in and Flipkart.com. Below is the comparison of the best options found.")
+
+2. Comparison Table:
+   - A markdown comparison table listing the products:
+     | Source | Product Name | Price | Rating | Direct Link |
+     |---|---|---|---|---|
+     | [Source/Store (e.g. Flipkart, Amazon.in)] | [Product Name] | [Price] | [Rating (e.g. N/A or 4.2)] | [View on [Store]]([Direct link URL]) |
+
+3. BEST VALUE Section:
+   - "BEST VALUE: The [Product Name] on [Store] at [Price] is the best value because [Reason from report]."
+
+4. Note / Research Logs Section:
+   - "Note: [State any login/captcha obstacles bypassed, search engines used, or navigation details from the browser report]."
+
+CRITICAL RULES:
+- Do NOT output any raw URLs as plain text; they must only be in markdown links like `[View on Store](url)`.
+- Use the exact keys, names, prices, ratings, and URLs from the validated cards JSON.
+- Output ONLY the final markdown. Do NOT wrap it in HTML, markdown codeblocks (like ```markdown), or add any conversational intro/outro text (e.g. "Here is the response:")."""
+
+    try:
+        loop = asyncio.get_event_loop()
+        raw = await loop.run_in_executor(None, _call_llm, prompt, "verification")
+        return raw.strip()
+    except Exception as e:
+        print(f"[ENRICH] Failed to clean response text: {e}")
+        return result_text
+
 async def enrich_response(query: str, res: dict) -> dict:
     """Enrich the agent response dict if it has an answer string."""
     if not res or "result" not in res or not isinstance(res["result"], str):
@@ -183,8 +231,9 @@ async def enrich_response(query: str, res: dict) -> dict:
     if not uncached_entities:
         # All entities were cached! Return immediately
         if cached_cards:
+            cleaned_text = await clean_result_text(query, result_text, cached_cards)
             res["result"] = {
-                "answer": result_text,
+                "answer": cleaned_text,
                 "cards": cached_cards
             }
         return res
@@ -258,8 +307,9 @@ async def enrich_response(query: str, res: dict) -> dict:
     all_cards = cached_cards + new_cards
     if all_cards:
         _save_cache(cache)
+        cleaned_text = await clean_result_text(query, result_text, all_cards)
         res["result"] = {
-            "answer": result_text,
+            "answer": cleaned_text,
             "cards": all_cards
         }
         

@@ -2,17 +2,17 @@
   <img src="frontend/logo.png" alt="Vayu Logo" width="180"/>
 </p>
 
-# Vayu — Autonomous Web Research Agent
+# Vayu — Autonomous Web Learning Agent
 
 > *"Vayu moves through the internet like wind — finding anything, anywhere, for you."*
 
-Vayu is an **autonomous multi-agent system** that browses the live web on your behalf. Ask it anything — flights, prices, jobs, hackathons, research — and it opens a real browser, navigates websites, extracts data, verifies results, and returns a structured answer. It gets smarter with every run.
+Vayu is a **universal browser agent** that browses the live web on your behalf. Ask it anything — it opens a real browser, navigates websites, extracts data, verifies results, and learns reusable web flows from every run.
 
 ---
 
 ## Problem Statement
 
-Finding information online today requires you to manually visit multiple sites, deal with cluttered UIs, compare fragmented data, and repeat this process every time. Agentic AI changes this: a single natural-language query should be enough to trigger a fully autonomous research loop across the live web.
+Finding information online today requires you to manually visit multiple sites, deal with cluttered UIs, compare fragmented data, and repeat this process every time. Agentic AI changes this: a single natural-language query should be enough to trigger a fully autonomous browser loop across the live web.
 
 Existing solutions either hallucinate (LLMs without browser access) or are hardcoded to specific websites (rule-based scrapers). Vayu is neither — it discovers sources dynamically, verifies its own results, and learns from every run.
 
@@ -20,13 +20,13 @@ Existing solutions either hallucinate (LLMs without browser access) or are hardc
 
 ## Solution Overview
 
-Vayu is a **FastAPI + browser-use + Gemini** system. An LLM-based intent router dynamically classifies tasks into either general research or comparison categories, routing them to the corresponding agent:
+Vayu is a **FastAPI + browser-use + Gemini** system. An LLM-based intent router dynamically classifies tasks into either chit-chat or browser-agent mode:
 
 | Query Type | Example | Agent |
 |---|---|---|
-| General Research | "Top AI startups in India 2025" | Research Agent (10-capability pipeline) |
-| Price/Option Comparison | "Samsung S24 vs iPhone 15 prices?" | Comparison Agent (Google-first discovery & comparison table) |
-| Travel, Jobs, & Hackathons | "Flights Mumbai → Delhi on June 15", "Python jobs in Bangalore" | Handled generalized via dynamic context memory injection |
+| Browser Work | "Top AI startups in India 2025" | Browser Agent (10-capability pipeline) |
+| Price/Option Comparison | "Samsung S24 vs iPhone 15 prices?" | Browser Agent (same pipeline, comparison-style output) |
+| Travel, Jobs, & Hackathons | "Flights Mumbai → Delhi on June 15", "Python jobs in Bangalore" | Handled through the same universal browser loop |
 | Conversational / Chit-chat | "hello", "thanks", "what is my name" | Handled directly via task router using context history (no browser task) |
 
 ---
@@ -34,13 +34,13 @@ Vayu is a **FastAPI + browser-use + Gemini** system. An LLM-based intent router 
 ## Architecture Overview
 
 ```
-User Query (Chainlit UI)
+User Query (Vayu web UI — static SPA served by FastAPI)
         │
         ▼
   FastAPI Backend (/api/tasks)
         │
         ▼
-  Task Router (LLM classify → comparison | research)
+  Task Router (LLM classify → chit_chat | browser_agent)
         │
    ┌────┴──────────────────────────────────────┐
    │                                           │
@@ -60,9 +60,9 @@ Research Agent (10-capability pipeline)    Comparison Agent
    └─ 7. Retry Loop (max 2) + Memory Update + Learner
 
   3-Tier Memory System
-   ├─ agent_memory.json  — per-domain: works/blocked/tips (travel/jobs/hackathons)
-   ├─ general_memory.json — cross-query: top sources, patterns
-   └─ web_knowledge.json — site perf, navigation hints, obstacles
+    ├─ agent_memory.json  — reusable site memory: works/blocked/tips/page flows
+    ├─ general_memory.json — cross-query: top sources, patterns
+    └─ web_knowledge.json — site flows, page types, obstacles, query patterns
 
   Two-Tier Model Router
    ├─ SMALL (gemini-flash-lite): planning, verification, classification
@@ -86,7 +86,7 @@ Research Agent (10-capability pipeline)    Comparison Agent
 ### Key AI Design Patterns
 
 - **Intent Classification** — LLM-based routing with few-shot rules, zero regex. Now supports context-aware chit-chat and conversational routing.
-- **Conversational Memory** — Follow-up queries (like "What is my name?") utilize preceding conversation history directly inside chit-chat or research contexts.
+- **Conversational Memory** — Follow-up queries (like "What is my name?") utilize preceding conversation history directly inside chit-chat or browser contexts.
 - **Query Engineering** — Google operator injection (`site:`, `filetype:`, date filters)
 - **Temporal Awareness** — "latest/new" queries auto-inject current year into searches
 - **Self-Verification** — Verifier LLM scores every result; triggers retry with hint
@@ -133,15 +133,12 @@ cp .env.example .env
 # Option A: Single script
 bash start.sh
 
-# Option B: Manual (two terminals)
-# Terminal 1 — Backend
+# Option B: Manual
 uvicorn backend.main:app --reload --port 8000
-
-# Terminal 2 — Frontend
-chainlit run frontend/app.py --port 8001
 ```
 
-Open **http://localhost:8001** in your browser.
+Open **http://localhost:8000** in your browser — the FastAPI backend serves the Vayu web UI (`frontend/index.html`) directly.
+Open **http://localhost:8000/knowledge** to inspect learned web flows and page patterns.
 
 ### Environment Variables
 
@@ -164,7 +161,6 @@ Open **http://localhost:8001** in your browser.
 | `browser-use` | 0.12.9 | Browser automation + LLM agent loop |
 | `playwright` | 1.47.0 | Chromium browser control |
 | `google-genai` | latest | Gemini API client |
-| `chainlit` | ≥2.11.1 | Chat UI frontend |
 | `apscheduler` | ≥3.10.0 | Background task scheduling |
 | `sqlalchemy` | ≥2.0.0 | Task state persistence |
 | `pdfplumber` | ≥0.11.0 | Resume PDF parsing |
@@ -180,8 +176,7 @@ vayu/
 │   ├── main.py                # FastAPI app, lifespan, browser pre-warm
 │   ├── config.py              # Settings (pydantic-settings)
 │   ├── agents/
-│   │   ├── research/agent.py  # 10-capability research pipeline
-│   │   ├── comparison/crew.py # Self-learning price comparison
+│   │   ├── research/agent.py  # 10-capability browser-agent pipeline
 │   │   └── price_monitor/     # Scheduled price alerts
 │   ├── tools/
 │   │   ├── browser.py         # browser-use wrapper, step streaming
@@ -195,7 +190,7 @@ vayu/
 │   │   ├── context.py         # System prompt builder
 │   │   └── step_tracker.py    # Step pass/fail tracking for replanner
 │   ├── memory/
-│   │   └── agent_memory.py    # 3-tier persistent memory system
+│   │   └── agent_memory.py    # Generic persistent web memory
 │   ├── monitoring/
 │   │   └── scheduler.py       # APScheduler for price monitors
 │   ├── api/
@@ -203,8 +198,8 @@ vayu/
 │   └── models/
 │       └── schemas.py         # Pydantic request/response models
 ├── frontend/
-│   ├── app.py                 # Chainlit chat UI
-│   └── index.html             # Standalone web UI
+│   ├── index.html             # Vayu web UI (static SPA, served by FastAPI)
+│   └── vayu.mp4               # Animated brand mark
 ├── requirements.txt
 ├── start.sh
 └── .env.example

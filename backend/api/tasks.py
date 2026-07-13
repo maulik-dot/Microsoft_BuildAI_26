@@ -40,9 +40,9 @@ def _new_task(task_id: str, **kwargs) -> dict:
     return record
 
 
-# --- General research endpoint ---
+# --- Universal browser-agent endpoint ---
 
-@router.post("/research")
+@router.post("/browse")
 async def start_research(request: ResearchRequest, background_tasks: BackgroundTasks):
     from backend.agents.research.agent import run_research
 
@@ -57,17 +57,12 @@ async def start_research(request: ResearchRequest, background_tasks: BackgroundT
 
         _update(task_id, status="running")
         try:
-            from backend.tools.task_router import route, classify
+            from backend.tools.task_router import route
             from backend.tools.context_resolver import resolve_query
 
-            # Parallelize: resolve follow-up + classify intent at the same time
-            resolved_query, task_type = await asyncio.gather(
-                asyncio.get_event_loop().run_in_executor(
-                    None, resolve_query, request.query, request.context
-                ),
-                asyncio.get_event_loop().run_in_executor(
-                    None, classify, request.query, request.context
-                ),
+        # Resolve follow-up context before routing.
+            resolved_query = await asyncio.get_event_loop().run_in_executor(
+                None, resolve_query, request.query, request.context
             )
 
             result = await route(resolved_query, task_id=task_id, context=request.context)
@@ -190,12 +185,22 @@ async def get_model_status():
         "gemini-3.5-flash":         {"limit": 20,   "tier": "large"},
         "gemini-2.0-flash":         {"limit": 200,  "tier": "large"},
         "gemini-3.1-flash-image":   {"limit": 20,   "tier": "large"},
+        # OpenRouter fallbacks — separate quota pool, reached once Gemini cools down
+        "openai/gpt-4o-mini":           {"limit": 0, "tier": "small", "provider": "openrouter"},
+        "google/gemini-2.5-flash-lite": {"limit": 0, "tier": "small", "provider": "openrouter"},
+        "openai/gpt-4o":                {"limit": 0, "tier": "large", "provider": "openrouter"},
+        "google/gemini-2.5-flash":      {"limit": 0, "tier": "large", "provider": "openrouter"},
     }
 
     results = []
     for model, meta in all_models.items():
         status = "unknown"
-        try:
+        # OpenRouter fallbacks: don't probe (each probe is a paid call). The key was
+        # validated at setup; report them as available standby capacity.
+        if meta.get("provider") == "openrouter":
+            status = "available" if settings.openrouter_api_key else "not_found"
+        else:
+          try:
             r = httpx.post(
                 f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={key}",
                 json={"contents": [{"parts": [{"text": "hi"}]}]},
@@ -210,7 +215,7 @@ async def get_model_status():
                 status = "not_found"
             else:
                 status = "error"
-        except Exception:
+          except Exception:
             status = "unreachable"
 
         # Get usage from eval tracker
@@ -273,7 +278,8 @@ async def seed_knowledge(request: dict):
     entry = sites_node.setdefault(site, {
         "success_count": 0, "fail_count": 0,
         "avg_steps": 0, "total_steps": 0, "runs": 0,
-        "tips": [], "navigation_hint": "", "last_seen": None,
+        "tips": [], "navigation_hint": "", "page_flows": {},
+        "last_seen": None,
     })
 
     if request.get("navigation_hint"):
@@ -286,14 +292,19 @@ async def seed_knowledge(request: dict):
                 existing_tips.append(tip)
         entry["tips"] = existing_tips[:10]
 
-    # Add to domain shortcuts
-    if request.get("category") and request.get("works_for"):
-        shortcuts = knowledge.setdefault("domain_shortcuts", {})
-        for cat in request["works_for"]:
-            cat_list = shortcuts.setdefault(cat.lower(), [])
-            if site not in cat_list:
-                cat_list.insert(0, site)
-            shortcuts[cat.lower()] = cat_list[:5]
+    # Record a reusable flow instead of a domain shortcut.
+    if request.get("navigation_hint") or request.get("tips"):
+        flow_bucket = entry.setdefault("page_flows", {}).setdefault("manual_seed", [])
+        flow_bucket.append({
+            "summary": request.get("navigation_hint", "manual seed"),
+            "steps": request.get("tips", [])[:5],
+            "result": request.get("category", ""),
+            "success": True,
+        })
+        entry["page_flows"]["manual_seed"] = flow_bucket[-5:]
+
+    if request.get("works_for"):
+        entry["best_for"] = list(dict.fromkeys((entry.get("best_for", []) + [w.lower() for w in request["works_for"]])))[:8]
 
     # Boost success count for seeded sites
     entry["success_count"] = max(entry.get("success_count", 0), 2)
@@ -364,6 +375,14 @@ async def correct_knowledge(request: dict):
         entry = sites_node.setdefault(good_site, {"success_count": 2, "fail_count": 0})
         if not entry.get("navigation_hint"):
             entry["navigation_hint"] = correct_approach[:200]
+        flow_bucket = entry.setdefault("page_flows", {}).setdefault("manual_correction", [])
+        flow_bucket.append({
+            "summary": correct_approach[:200],
+            "steps": [what_went_wrong[:80]] if what_went_wrong else [],
+            "result": query[:120],
+            "success": True,
+        })
+        entry["page_flows"]["manual_correction"] = flow_bucket[-5:]
 
     _save(knowledge)
     return {
@@ -379,8 +398,8 @@ async def reset_knowledge():
     """Reset the web knowledge base (useful for testing)."""
     from backend.tools.learner import _save
     _save({
-        "sites": {}, "search_patterns": {},
-        "obstacle_solutions": [], "domain_shortcuts": {},
+        "sites": {}, "web_patterns": {}, "query_patterns": {},
+        "obstacle_solutions": [],
         "last_updated": None,
     })
     return {"status": "knowledge base reset"}
