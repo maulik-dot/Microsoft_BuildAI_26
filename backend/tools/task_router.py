@@ -74,7 +74,7 @@ Return only your direct reply.""", task_type="planning")
     res = await run_research(query, task_id=task_id)
 
     from backend.tools.rich_cards import enrich_response
-    return await enrich_response(query, res)
+    return await enrich_response(query, res, task_id)
 
 
 # ── Param parsers ──────────────────────────────────────────────────────────

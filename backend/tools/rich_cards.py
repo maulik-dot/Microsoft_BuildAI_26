@@ -57,6 +57,7 @@ RESULT SNIPPET:
 
 Rules:
 - Identify up to 4 distinct entities.
+- Do NOT treat online stores, retailers, marketplaces, or search engines (e.g. Amazon, Flipkart, Croma, Myntra, AJIO, Reliance Digital, Google, YouTube) as entities — they are sellers/sources, not the thing itself. Only the actual product/place/movie/book/person counts.
 - For each entity, specify:
   * "name": official name (e.g. "iPhone 16 Pro", "Eiffel Tower", "Inception")
   * "type": one of ["product", "place", "media", "profile"]
@@ -67,7 +68,11 @@ Return the result ONLY as a JSON code block wrapped in ```json ... ```. If no en
     loop = asyncio.get_event_loop()
     raw = await loop.run_in_executor(None, _call_llm, prompt, "verification")
     parsed = _parse_json(raw)
-    return parsed if isinstance(parsed, list) else []
+    if not isinstance(parsed, list):
+        return []
+    # Belt-and-suspenders: drop any retailer/marketplace/source the LLM slipped in.
+    return [e for e in parsed
+            if isinstance(e, dict) and e.get("name") and not _is_retailer_name(e["name"])]
 
 async def fetch_wikipedia_summary(entity_name: str) -> dict:
     """Query Wikipedia Rest API for summary details and official image."""
@@ -101,7 +106,16 @@ ENTITIES TO EXTRACT:
 RESEARCH REPORT:
 {result_text[:4000]}
 
-For each entity, extract its details from the report. If not found in the report, use general knowledge or keep empty.
+For each entity, extract its details from the report.
+
+STRICT URL RULE — this is critical:
+- All URL/link fields (official_url, external_links[].url, image) MUST be copied VERBATIM from the RESEARCH REPORT text above.
+- If a URL is not literally present in the report, leave it as "" (or omit external_links). Do NOT invent, guess, or fill it from general knowledge.
+- NEVER output a generic/company/reference URL (e.g. wikipedia.org, apple.com or any brand homepage) in place of a real retailer product-page link — a missing link is better than a wrong one.
+- For a price-comparison query the value is the per-retailer product links (Amazon/Flipkart/Croma/etc.); only include a retailer in external_links if its actual product URL appears in the report.
+
+For NON-URL fields only (description, brand, year, genre, etc.) you may use general knowledge if the report is silent.
+
 Format the response as a JSON object where the keys are the exact entity names, and the values are objects with these fields depending on the entity's type:
 
 For product:
@@ -203,7 +217,123 @@ CRITICAL RULES:
         print(f"[ENRICH] Failed to clean response text: {e}")
         return result_text
 
-async def enrich_response(query: str, res: dict) -> dict:
+# ── Retailer product-link capture (from the agent's real navigation) ─────────
+
+_RETAILERS = {
+    "amazon.":          "Amazon",
+    "flipkart.":        "Flipkart",
+    "croma.com":        "Croma",
+    "reliancedigital.": "Reliance Digital",
+    "tatacliq.":        "Tata CLiQ",
+    "vijaysales.":      "Vijay Sales",
+    "myntra.":          "Myntra",
+    "ajio.":            "AJIO",
+    "snapdeal.":        "Snapdeal",
+    "nykaa.":           "Nykaa",
+    "meesho.":          "Meesho",
+}
+# Path fragments that mark an actual product/details page (not search / home).
+_PRODUCT_PATH_HINTS = ("/dp/", "/gp/product/", "/p/", "/product/", "/prod/", "/itm", "/buy")
+
+# Names that are sellers/sources, never product entities → never get their own card.
+_NON_ENTITY_NAMES = {v.lower() for v in _RETAILERS.values()} | {
+    "google", "google shopping", "youtube", "wikipedia", "reddit", "quora",
+    "bing", "jiomart", "paytm mall", "shopclues",
+}
+_RETAILER_KEYWORDS = tuple(sorted(
+    {v.lower() for v in _RETAILERS.values()} | {"jiomart", "shopclues", "paytm"},
+    key=len, reverse=True))
+
+
+def _is_retailer_name(name: str) -> bool:
+    """True for store/marketplace/source names (Amazon, Flipkart, Croma…), not products."""
+    n = re.sub(r"\.(co\.in|com|in)$", "", (name or "").strip().lower()).strip()
+    if not n:
+        return True
+    if n in _NON_ENTITY_NAMES:
+        return True
+    for kw in _RETAILER_KEYWORDS:
+        if n == kw or n.startswith(kw + " ") or n.endswith(" " + kw):
+            return True
+    return False
+
+
+def _is_product_url(url: str) -> bool:
+    u = (url or "").lower()
+    if not u.startswith("http"):
+        return False
+    if any(s in u for s in ("google.", "bing.", "duckduckgo.", "/search", "/s?", "?k=")):
+        return False
+    return any(h in u for h in _PRODUCT_PATH_HINTS)
+
+
+def _tokens(s: str) -> set:
+    return {t for t in re.findall(r"[a-z0-9]+", (s or "").lower()) if len(t) > 1}
+
+
+def collect_retailer_links(task_id: str) -> list[dict]:
+    """
+    Pull the retailer PRODUCT-page URLs the agent actually visited out of the step
+    log. Returns one {label, url, title} per retailer — real, navigated URLs, which
+    are far more reliable than re-extracting links from the report prose.
+    """
+    if not task_id:
+        return []
+    try:
+        from backend.tools.browser import get_steps
+        steps = get_steps(task_id)
+    except Exception:
+        return []
+    picked: dict[str, dict] = {}
+    for step in steps:
+        url = (step.get("url") or "").strip()
+        if not _is_product_url(url):
+            continue
+        low = url.lower()
+        for frag, label in _RETAILERS.items():
+            if frag in low:
+                picked.setdefault(label, {"label": label, "url": url,
+                                          "title": step.get("title") or ""})
+                break
+    return list(picked.values())
+
+
+def _finalize_product_cards(cards: list[dict], task_id: str) -> None:
+    """
+    Post-process product cards in place:
+      • drop a Wikipedia page masquerading as official_url (products want retailer links),
+      • graft on the retailer product URLs the agent actually visited, matched to the
+        right card and deduped by URL.
+    """
+    product_cards = [c for c in cards if c.get("type") == "product"]
+    if not product_cards:
+        return
+
+    # A Wikipedia article is never a product's "official site".
+    for c in product_cards:
+        if "wikipedia.org" in (c.get("official_url") or "").lower():
+            c["official_url"] = ""
+
+    links = collect_retailer_links(task_id)
+    if not links:
+        return
+    single = len(product_cards) == 1
+    for card in product_cards:
+        ctoks = _tokens(card.get("title"))
+        card.setdefault("external_links", [])
+        seen = {(l.get("url") or "").split("?")[0] for l in card["external_links"]}
+        for link in links:
+            base = (link["url"] or "").split("?")[0]
+            if not base or base in seen:
+                continue
+            ltoks = _tokens(link.get("title")) | _tokens(link["url"])
+            # attach when it's the only product card, or the titles clearly overlap
+            if single or len(ctoks & ltoks) >= 2:
+                card["external_links"].append({"label": link["label"], "url": link["url"]})
+                seen.add(base)
+
+
+async def enrich_response(query: str, res: dict, task_id: str = "") -> dict:
     """Enrich the agent response dict if it has an answer string."""
     if not res or "result" not in res or not isinstance(res["result"], str):
         return res
@@ -231,6 +361,7 @@ async def enrich_response(query: str, res: dict) -> dict:
     if not uncached_entities:
         # All entities were cached! Return immediately
         if cached_cards:
+            _finalize_product_cards(cached_cards, task_id)
             cleaned_text = await clean_result_text(query, result_text, cached_cards)
             res["result"] = {
                 "answer": cleaned_text,
@@ -307,6 +438,9 @@ async def enrich_response(query: str, res: dict) -> dict:
     all_cards = cached_cards + new_cards
     if all_cards:
         _save_cache(cache)
+        # Attach the agent's real visited product URLs AFTER caching, so these
+        # session-specific links never get baked into the persistent card cache.
+        _finalize_product_cards(all_cards, task_id)
         cleaned_text = await clean_result_text(query, result_text, all_cards)
         res["result"] = {
             "answer": cleaned_text,
