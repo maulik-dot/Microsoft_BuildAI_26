@@ -1,0 +1,39 @@
+# Secrets — NEVER bake these into the image (keys are passed as runtime secrets)
+.env
+.env.*
+!.env.example
+
+# Git / VCS
+.git
+.gitignore
+.github
+
+# Python caches / local envs
+__pycache__/
+**/__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+
+# Local runtime state (regenerated in the container)
+*.db
+*.sqlite
+*.sqlite3
+backend/memory/entity_cache.json
+model_evals.json
+uploads/
+.chainlit/
+
+# Logs / OS cruft
+*.log
+.DS_Store
+
+# Large/dev-only artifacts not needed at runtime
+Vayu_Deck.pptx
+generate_deck.py
+*.neon-backup
+scratchpad/
