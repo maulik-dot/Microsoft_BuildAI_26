@@ -333,6 +333,15 @@ def _finalize_product_cards(cards: list[dict], task_id: str) -> None:
                 seen.add(base)
 
 
+async def _fetch_card_images(cards: list) -> None:
+    """Best-effort: fill product-card images from their retailer URLs. Never raises."""
+    try:
+        from backend.tools.product_image import fetch_product_images
+        await fetch_product_images(cards)
+    except Exception:
+        pass
+
+
 async def enrich_response(query: str, res: dict, task_id: str = "") -> dict:
     """Enrich the agent response dict if it has an answer string."""
     if not res or "result" not in res or not isinstance(res["result"], str):
@@ -362,6 +371,7 @@ async def enrich_response(query: str, res: dict, task_id: str = "") -> dict:
         # All entities were cached! Return immediately
         if cached_cards:
             _finalize_product_cards(cached_cards, task_id)
+            await _fetch_card_images(cached_cards)
             cleaned_text = await clean_result_text(query, result_text, cached_cards)
             res["result"] = {
                 "answer": cleaned_text,
@@ -437,10 +447,12 @@ async def enrich_response(query: str, res: dict, task_id: str = "") -> dict:
         
     all_cards = cached_cards + new_cards
     if all_cards:
-        _save_cache(cache)
-        # Attach the agent's real visited product URLs AFTER caching, so these
-        # session-specific links never get baked into the persistent card cache.
+        # Attach the agent's real visited product URLs, then fetch product images for
+        # cards still missing one — before caching, so repeat queries return the
+        # fully-enriched card (links + image) instantly.
         _finalize_product_cards(all_cards, task_id)
+        await _fetch_card_images(all_cards)
+        _save_cache(cache)
         cleaned_text = await clean_result_text(query, result_text, all_cards)
         res["result"] = {
             "answer": cleaned_text,

@@ -36,7 +36,10 @@ COPY supervisord.conf /etc/supervisor/conf.d/vayu.conf
 ENV PORT=8000
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1
-# Run browser in headless mode on cloud
+# Run browser in headless mode on cloud — browser-use reads HEADLESS (the product
+# image fetcher launches headless too). Without this the agent Chromium tries to
+# open a window and fails in a display-less container.
+ENV HEADLESS=true
 ENV DISPLAY=""
 
 EXPOSE 8000

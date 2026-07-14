@@ -1,3 +1,14 @@
+---
+title: Vayu
+emoji: 🌀
+colorFrom: blue
+colorTo: green
+sdk: docker
+app_port: 8000
+pinned: false
+short_description: Autonomous web-browsing AI agent that researches the live web
+---
+
 <p align="center">
   <img src="frontend/logo.png" alt="Vayu Logo" width="180"/>
 </p>

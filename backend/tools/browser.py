@@ -28,6 +28,10 @@ def _make_browser(keep_alive: bool = True) -> Browser:
         browser_profile=BrowserProfile(
             headless=headless,
             disable_security=True,
+            # Container-safe: run Chromium without the sandbox (required as root in a
+            # container, e.g. Hugging Face Spaces) and avoid /dev/shm crashes.
+            chromium_sandbox=False,
+            args=["--disable-dev-shm-usage"],
             keep_alive=keep_alive,
             minimum_wait_page_load_time=0.5,
             wait_between_actions=0.3,
