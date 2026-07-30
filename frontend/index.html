@@ -1554,6 +1554,19 @@ document.addEventListener('click', () => {
   }
 }, { once: true });
 
+// Force every link inside chat content to open in a NEW TAB. Delegation covers
+// markdown answer links, rich-card buttons, and even messages restored from an old
+// saved chat — regardless of whether the target attribute was stamped at render time.
+document.addEventListener('click', function (e) {
+  const a = e.target.closest && e.target.closest('a[href]');
+  if (!a) return;
+  const href = a.getAttribute('href') || '';
+  if (!/^https?:\/\//i.test(href)) return;   // only external http(s) links
+  if (!a.closest('#ci')) return;             // only within the chat content
+  e.preventDefault();
+  window.open(href, '_blank', 'noopener');
+});
+
 // Initialise session and suggestions on startup
 currentChatId = genId();
 loadSuggestions();

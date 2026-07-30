@@ -339,6 +339,102 @@ def _extract_links_from_text(result_text: str) -> list[dict]:
     return list(links.values())
 
 
+# ── URL grounding: nothing shown to the user may contain a link the agent did not
+#    actually navigate to or extract. We build the set of REAL URLs from the agent's
+#    step log + its raw report, then repair any link the copywriter LLM invented. ────
+
+def _registrable_domain(url: str) -> str:
+    m = re.search(r"https?://(?:www\.)?([^/:?#]+)", (url or "").lower())
+    return m.group(1) if m else ""
+
+
+def _is_showable_url(url: str) -> bool:
+    """A URL we may show the user: a specific page the agent could have found — not a
+    search-results page, not a bare homepage, and (for a retailer/booking domain) an
+    actual product/booking page rather than a store landing page. Unknown domains with
+    a real path are allowed, so genuine article/official links in research answers
+    survive grounding."""
+    u = (url or "").lower()
+    if not u.startswith("http"):
+        return False
+    if any(s in u for s in ("google.", "bing.", "duckduckgo.", "wikipedia.org",
+                            "/search", "/s?", "?k=", "about:blank")):
+        return False
+    # bare homepage (no real path) is not a useful destination
+    path = re.sub(r"^https?://[^/]+", "", u.split("#")[0].split("?")[0]).strip("/")
+    if not path:
+        return False
+    # a known retailer/booking domain must resolve to an actionable product/booking page
+    if _is_known_source(u) and not _is_actionable_url(u):
+        return False
+    return True
+
+
+def _grounded_urls(raw_text: str, task_id: str) -> list[str]:
+    """Every REAL URL the agent produced (raw report) or visited (step log) that is safe
+    to show — most-specific-first, so grounding picks the best real link per domain.
+    A URL the copywriter invents (never produced/visited) will not be in this set."""
+    urls: list[str] = []
+    try:
+        from backend.tools.browser import get_steps
+        for s in get_steps(task_id):
+            u = (s.get("url") or "").strip()
+            if _is_showable_url(u):
+                urls.append(u)
+    except Exception:
+        pass
+    for raw in re.findall(r'https?://[^\s\)\]\}"\'<>]+', raw_text or ""):
+        u = raw.rstrip('.,;:')
+        if _is_showable_url(u):
+            urls.append(u)
+    # de-dupe by full url, then order by specificity (desc) so best link wins per domain
+    seen, out = set(), []
+    for u in sorted(urls, key=_url_specificity, reverse=True):
+        if u not in seen:
+            seen.add(u)
+            out.append(u)
+    return out
+
+
+def _ground_markdown_urls(md: str, grounded: list[str]) -> str:
+    """Repair every markdown link in the answer so it points ONLY at a URL the agent
+    really found: keep it if it's grounded, swap it for the real same-domain URL if the
+    LLM altered it, or strip the hyperlink entirely if the agent never found that source
+    (so a fabricated homepage link like https://www.amazon.in never reaches the user)."""
+    if not md:
+        return md
+    grounded_bases = {u.split("?")[0] for u in grounded}
+    best_by_domain: dict[str, str] = {}
+    for u in grounded:                       # grounded is already best-first
+        best_by_domain.setdefault(_registrable_domain(u), u)
+
+    def repair(m):
+        text, url = m.group(1), m.group(2)
+        if url in grounded or url.split("?")[0] in grounded_bases:
+            return m.group(0)                # exact real link — keep
+        dom = _registrable_domain(url)
+        if dom in best_by_domain:
+            return f"[{text}]({best_by_domain[dom]})"   # LLM mangled it → real one
+        return text                          # fabricated source → drop the link
+
+    return re.sub(r"\[([^\]]+)\]\((https?://[^)\s]+)\)", repair, md)
+
+
+def _drop_noise_product_cards(cards: list[dict]) -> list[dict]:
+    """Drop product cards that are just incidental mentions — no price AND no real link
+    (e.g. 'newer models like the iPhone 16e/17' named in passing). Non-product cards are
+    kept, since a place/media card can be useful with only an image + description."""
+    kept = []
+    for c in cards:
+        if c.get("type") == "product":
+            has_price = bool((c.get("price") or "").strip())
+            has_link = bool(c.get("official_url")) or bool(c.get("external_links"))
+            if not has_price and not has_link:
+                continue
+        kept.append(c)
+    return kept
+
+
 def _tokens(s: str) -> set:
     return {t for t in re.findall(r"[a-z0-9]+", (s or "").lower()) if len(t) > 1}
 
@@ -409,14 +505,16 @@ def _finalize_cards(cards: list[dict], task_id: str, result_text: str = "") -> N
     if not cards:
         return
 
-    # Sanitize whatever the LLM already put on each card: drop a Wikipedia article or a
-    # retailer/booking homepage/landing page masquerading as the official_url, and strip
-    # the same junk out of any pre-existing external_links.
+    # Sanitize whatever the LLM already put on each card: a link is only kept if it is a
+    # SHOWABLE URL (a specific product/booking/detail page — not empty, not a Wikipedia
+    # article, not a retailer/booking homepage/landing/search page). This drops broken
+    # empty-URL buttons and homepages that the extractor sometimes emits.
     for c in cards:
-        if _is_junk_link(c.get("official_url") or ""):
+        ou = c.get("official_url") or ""
+        if ou and not _is_showable_url(ou):
             c["official_url"] = ""
         c["external_links"] = [l for l in (c.get("external_links") or [])
-                               if not _is_junk_link(l.get("url") or "")]
+                               if _is_showable_url(l.get("url") or "")]
 
     # Real navigated URLs (step log) + actionable URLs from the report text, deduped.
     links = collect_retailer_links(task_id) + _extract_links_from_text(result_text)
@@ -495,8 +593,10 @@ async def enrich_response(query: str, res: dict, task_id: str = "") -> dict:
         # All entities were cached! Return immediately
         if cached_cards:
             _finalize_cards(cached_cards, task_id, result_text)
+            cached_cards = _drop_noise_product_cards(cached_cards)
             await _fetch_card_images(cached_cards)
             cleaned_text = await clean_result_text(query, result_text, cached_cards)
+            cleaned_text = _ground_markdown_urls(cleaned_text, _grounded_urls(result_text, task_id))
             res["result"] = {
                 "answer": cleaned_text,
                 "cards": cached_cards
@@ -577,12 +677,16 @@ async def enrich_response(query: str, res: dict, task_id: str = "") -> dict:
         # cards still missing one — before caching, so repeat queries return the
         # fully-enriched card (links + image) instantly.
         _finalize_cards(all_cards, task_id, result_text)
+        all_cards = _drop_noise_product_cards(all_cards)
         await _fetch_card_images(all_cards)
         _save_cache(cache)
         cleaned_text = await clean_result_text(query, result_text, all_cards)
+        # Ground every link in the answer against the URLs the agent really found —
+        # the copywriter LLM otherwise invents homepages/wrong links (and rows).
+        cleaned_text = _ground_markdown_urls(cleaned_text, _grounded_urls(result_text, task_id))
         res["result"] = {
             "answer": cleaned_text,
             "cards": all_cards
         }
-        
+
     return res
