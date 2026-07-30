@@ -232,13 +232,35 @@ _RETAILERS = {
     "nykaa.":           "Nykaa",
     "meesho.":          "Meesho",
 }
-# Path fragments that mark an actual product/details page (not search / home).
-_PRODUCT_PATH_HINTS = ("/dp/", "/gp/product/", "/p/", "/product/", "/prod/", "/itm", "/buy")
+# Ticketing / booking / events sources — their deep links are the actionable URL for
+# movie/event/show queries (e.g. a BookMyShow seat-layout page), just like a retailer
+# product page is for a shopping query.
+_BOOKING_SITES = {
+    "bookmyshow.":   "BookMyShow",
+    "district.in":   "District",
+    "insider.in":    "Paytm Insider",
+    "ticketmaster.": "Ticketmaster",
+    "ticketnew.":    "TicketNew",
+    "townscript.":   "Townscript",
+}
+# Every source we can label a URL with (retailers + booking sites).
+_ALL_SOURCES = {**_RETAILERS, **_BOOKING_SITES}
+
+# Path fragments that mark an actual product/details/booking page (not search / home).
+_PRODUCT_PATH_HINTS = (
+    "/dp/", "/gp/product/", "/p/", "/product/", "/prod/", "/itm", "/buy",
+    # ticketing / booking deep-link paths
+    "/seat-layout/", "/buytickets/", "/movies/", "/events/", "/event/",
+    "/shows/", "/show/", "/booking", "/tickets",
+)
 
 # Names that are sellers/sources, never product entities → never get their own card.
 _NON_ENTITY_NAMES = {v.lower() for v in _RETAILERS.values()} | {
     "google", "google shopping", "youtube", "wikipedia", "reddit", "quora",
     "bing", "jiomart", "paytm mall", "shopclues",
+    # booking sources are sellers too, not the movie/event itself
+    "bookmyshow", "book my show", "district", "paytm insider", "insider",
+    "ticketmaster", "ticketnew", "townscript", "paytm",
 }
 _RETAILER_KEYWORDS = tuple(sorted(
     {v.lower() for v in _RETAILERS.values()} | {"jiomart", "shopclues", "paytm"},
@@ -258,13 +280,63 @@ def _is_retailer_name(name: str) -> bool:
     return False
 
 
-def _is_product_url(url: str) -> bool:
+def _is_actionable_url(url: str) -> bool:
+    """A real product/booking/details page the user can act on — not a search page,
+    a homepage/landing page, or an encyclopedia article."""
     u = (url or "").lower()
     if not u.startswith("http"):
         return False
-    if any(s in u for s in ("google.", "bing.", "duckduckgo.", "/search", "/s?", "?k=")):
+    # Search engines, encyclopedias, and generic landing/account pages are never a
+    # buyable/bookable destination.
+    if any(s in u for s in ("google.", "bing.", "duckduckgo.", "wikipedia.org",
+                            "/search", "/s?", "?k=",
+                            "/explore", "/home/", "/gift", "/login", "/account")):
         return False
     return any(h in u for h in _PRODUCT_PATH_HINTS)
+
+
+# How specific/actionable a URL is — a direct seat-layout/buy page beats a listing page,
+# so we promote the most actionable link to the card's primary button.
+def _url_specificity(url: str) -> int:
+    u = (url or "").lower()
+    if any(h in u for h in ("/seat-layout/", "/buytickets/")):
+        return 3   # direct booking page
+    if any(h in u for h in ("/dp/", "/gp/product/", "/itm", "/product/", "/prod/",
+                            "/buy", "/tickets", "/event/", "/p/")):
+        return 2   # direct product / event detail page
+    if any(h in u for h in ("/movies/", "/events/", "/shows/", "/show/", "/booking")):
+        return 1   # listing page (has the item, but not the buy step)
+    return 0
+
+
+def _label_for_url(url: str) -> str:
+    """Human label for a source URL (Amazon, BookMyShow, …), falling back to domain."""
+    low = (url or "").lower()
+    for frag, label in _ALL_SOURCES.items():
+        if frag in low:
+            return label
+    m = re.search(r"https?://(?:www\.)?([^/:]+)", low)
+    if m:
+        core = m.group(1).split(".")[0]
+        if core:
+            return core[:1].upper() + core[1:]
+    return "Open"
+
+
+def _extract_links_from_text(result_text: str) -> list[dict]:
+    """Mine actionable product/booking URLs straight from the report prose.
+
+    This is the fallback for when the step log is unavailable (e.g. a cache hit, where
+    there are no live steps) or when the LLM extractor dropped the link — the report
+    text almost always still contains the real URL (in a markdown link or a table)."""
+    links: dict[str, dict] = {}
+    for raw in re.findall(r'https?://[^\s\)\]\}"\'<>]+', result_text or ""):
+        url = raw.rstrip('.,;:')
+        if not _is_actionable_url(url):
+            continue
+        base = url.split("?")[0]
+        links.setdefault(base, {"label": _label_for_url(url), "url": url, "title": ""})
+    return list(links.values())
 
 
 def _tokens(s: str) -> set:
@@ -287,50 +359,102 @@ def collect_retailer_links(task_id: str) -> list[dict]:
     picked: dict[str, dict] = {}
     for step in steps:
         url = (step.get("url") or "").strip()
-        if not _is_product_url(url):
+        if not _is_actionable_url(url):
             continue
         low = url.lower()
-        for frag, label in _RETAILERS.items():
+        for frag, label in _ALL_SOURCES.items():
             if frag in low:
-                picked.setdefault(label, {"label": label, "url": url,
-                                          "title": step.get("title") or ""})
+                cand = {"label": label, "url": url, "title": step.get("title") or ""}
+                cur = picked.get(label)
+                # Keep the MOST actionable page per source (seat-layout > listing),
+                # not merely the first one the agent happened to land on.
+                if cur is None or _url_specificity(url) > _url_specificity(cur["url"]):
+                    picked[label] = cand
                 break
     return list(picked.values())
 
 
-def _finalize_product_cards(cards: list[dict], task_id: str) -> None:
+def _is_booking_url(url: str) -> bool:
+    low = (url or "").lower()
+    return any(frag in low for frag in _BOOKING_SITES)
+
+
+def _is_known_source(url: str) -> bool:
+    """URL is on a retailer/booking domain we recognise (Amazon, BookMyShow, …)."""
+    low = (url or "").lower()
+    return any(frag in low for frag in _ALL_SOURCES)
+
+
+def _is_junk_link(url: str) -> bool:
+    """A link we must never surface: a Wikipedia article, or a known-source URL that
+    is a homepage/landing/search page rather than an actionable product/booking page.
+    (Unknown domains are left alone — they may be a legitimate official site or IMDb.)"""
+    low = (url or "").lower()
+    if "wikipedia.org" in low:
+        return True
+    return _is_known_source(url) and not _is_actionable_url(url)
+
+
+def _finalize_cards(cards: list[dict], task_id: str, result_text: str = "") -> None:
     """
-    Post-process product cards in place:
-      • drop a Wikipedia page masquerading as official_url (products want retailer links),
-      • graft on the retailer product URLs the agent actually visited, matched to the
-        right card and deduped by URL.
+    Post-process ALL cards in place (products, media, places, profiles):
+      • never let a Wikipedia article stand in as the primary official_url — for a
+        shopping/ticketing agent the actionable retailer/booking link is what matters,
+      • graft on the real retailer/booking URLs the agent visited (step log) PLUS any
+        actionable URLs mined from the report prose (fallback for cache hits / when the
+        LLM dropped the link), matched to the right card and deduped,
+      • promote the best actionable link to official_url so both card renderers (the
+        "Official Site" button and the carousel card link) point at something useful.
     """
-    product_cards = [c for c in cards if c.get("type") == "product"]
-    if not product_cards:
+    if not cards:
         return
 
-    # A Wikipedia article is never a product's "official site".
-    for c in product_cards:
-        if "wikipedia.org" in (c.get("official_url") or "").lower():
+    # Sanitize whatever the LLM already put on each card: drop a Wikipedia article or a
+    # retailer/booking homepage/landing page masquerading as the official_url, and strip
+    # the same junk out of any pre-existing external_links.
+    for c in cards:
+        if _is_junk_link(c.get("official_url") or ""):
             c["official_url"] = ""
+        c["external_links"] = [l for l in (c.get("external_links") or [])
+                               if not _is_junk_link(l.get("url") or "")]
 
-    links = collect_retailer_links(task_id)
+    # Real navigated URLs (step log) + actionable URLs from the report text, deduped.
+    links = collect_retailer_links(task_id) + _extract_links_from_text(result_text)
+    deduped: dict[str, dict] = {}
+    for l in links:
+        base = (l.get("url") or "").split("?")[0]
+        if base and base not in deduped:
+            deduped[base] = l
+    links = list(deduped.values())
     if not links:
         return
-    single = len(product_cards) == 1
-    for card in product_cards:
+
+    single = len(cards) == 1
+    for card in cards:
         ctoks = _tokens(card.get("title"))
-        card.setdefault("external_links", [])
-        seen = {(l.get("url") or "").split("?")[0] for l in card["external_links"]}
+        ctype = card.get("type")
+        matched = list(card.get("external_links") or [])
+        seen = {(l.get("url") or "").split("?")[0] for l in matched}
         for link in links:
             base = (link["url"] or "").split("?")[0]
             if not base or base in seen:
                 continue
             ltoks = _tokens(link.get("title")) | _tokens(link["url"])
-            # attach when it's the only product card, or the titles clearly overlap
-            if single or len(ctoks & ltoks) >= 2:
-                card["external_links"].append({"label": link["label"], "url": link["url"]})
+            token_match = len(ctoks & ltoks) >= 2
+            # Booking/ticketing links carry opaque IDs (no title tokens to match on),
+            # so attach them to the media/place card they belong to.
+            booking_match = _is_booking_url(link["url"]) and ctype in ("media", "place")
+            if single or token_match or booking_match:
+                matched.append({"label": link["label"], "url": link["url"]})
                 seen.add(base)
+        # Most actionable link first (direct booking/product page > listing), so both
+        # the primary button and the promoted official_url point at the buy step.
+        matched.sort(key=lambda l: _url_specificity(l.get("url", "")), reverse=True)
+        card["external_links"] = matched
+        # Promote the best actionable link to primary when the card has no official_url
+        # (e.g. after scrubbing a Wikipedia link, or when the LLM left it blank).
+        if not card.get("official_url") and matched:
+            card["official_url"] = matched[0]["url"]
 
 
 async def _fetch_card_images(cards: list) -> None:
@@ -370,7 +494,7 @@ async def enrich_response(query: str, res: dict, task_id: str = "") -> dict:
     if not uncached_entities:
         # All entities were cached! Return immediately
         if cached_cards:
-            _finalize_product_cards(cached_cards, task_id)
+            _finalize_cards(cached_cards, task_id, result_text)
             await _fetch_card_images(cached_cards)
             cleaned_text = await clean_result_text(query, result_text, cached_cards)
             res["result"] = {
@@ -419,7 +543,9 @@ async def enrich_response(query: str, res: dict, task_id: str = "") -> dict:
                 "title": llm_data.get("title") or name,
                 "description": llm_data.get("description") or wiki_res.get("description") or "",
                 "image": llm_data.get("image") or wiki_res.get("image") or _extract_image_from_text(name, result_text) or "",
-                "official_url": wiki_res.get("official_url") or llm_data.get("official_url") or "",
+                # Prefer the real link the LLM copied from the report over a Wikipedia
+                # page; _finalize_cards scrubs any Wikipedia URL that slips through here.
+                "official_url": llm_data.get("official_url") or wiki_res.get("official_url") or "",
                 "external_links": llm_data.get("external_links") or [],
             }
             
@@ -450,7 +576,7 @@ async def enrich_response(query: str, res: dict, task_id: str = "") -> dict:
         # Attach the agent's real visited product URLs, then fetch product images for
         # cards still missing one — before caching, so repeat queries return the
         # fully-enriched card (links + image) instantly.
-        _finalize_product_cards(all_cards, task_id)
+        _finalize_cards(all_cards, task_id, result_text)
         await _fetch_card_images(all_cards)
         _save_cache(cache)
         cleaned_text = await clean_result_text(query, result_text, all_cards)

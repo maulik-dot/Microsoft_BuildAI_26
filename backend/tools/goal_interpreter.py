@@ -4,7 +4,7 @@ Detects ambiguity, generates one clarifying question, and defines the success co
 """
 
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 from backend.tools.planner import _call_llm
 # Uses SMALL model — ambiguity detection is a simple classification task
 
@@ -20,9 +20,27 @@ def interpret(query: str) -> dict:
     """
     now = datetime.now()
     CURRENT_YEAR = str(now.year)
-    CURRENT_DATE = now.strftime("%B %d, %Y")  # e.g. "June 05, 2026"
+    CURRENT_DATE = now.strftime("%A, %B %d, %Y")  # e.g. "Wednesday, July 15, 2026"
+
+    # Resolve common relative dates to concrete calendar dates — LLMs are unreliable
+    # at date arithmetic, so compute them here and hand them to the model.
+    wd = now.weekday()  # Mon=0 .. Sun=6
+    _sat = now - timedelta(days=wd - 5) if wd >= 5 else now + timedelta(days=5 - wd)
+    _sun = _sat + timedelta(days=1)
+    _tom = now + timedelta(days=1)
+    _nsat, _nsun = _sat + timedelta(days=7), _sun + timedelta(days=7)
+    _f = lambda d: d.strftime("%A %B %d, %Y")
+    DATE_REFERENCE = (
+        f"- Today: {_f(now)}\n"
+        f"- Tomorrow: {_f(_tom)}\n"
+        f'- "this weekend": {_sat.strftime("%B %d")} to {_sun.strftime("%B %d, %Y")}\n'
+        f'- "next weekend": {_nsat.strftime("%B %d")} to {_nsun.strftime("%B %d, %Y")}'
+    )
 
     prompt = f"""You are a query analyst for a browser agent. Today's date is {CURRENT_DATE}.
+
+DATE REFERENCE (use these exact dates to resolve relative time phrases):
+{DATE_REFERENCE}
 
 Analyse this user query and return JSON with exactly these fields:
 
@@ -36,10 +54,11 @@ Rules:
 - clarifying_question: if is_ambiguous=true, write ONE short question. If false, set null.
 - success_condition: what a complete correct answer must contain.
 - refined_query: rewrite the query to be more precise. IMPORTANT:
+  * RELATIVE DATES: if the query says "this weekend", "tomorrow", "tonight", "next weekend", "next Friday", "today" etc., REPLACE that phrase in refined_query with the explicit calendar date(s) from the DATE REFERENCE above (e.g. "this weekend" → "{_sat.strftime("%d")}-{_sun.strftime("%d %B %Y")}"). Critical for flights, hotels and events.
   * If the query contains "latest", "new", "recent", "upcoming", "newest" → add "{CURRENT_YEAR}" to the refined query so searches are time-filtered. Example: "latest trailer of X" → "X {CURRENT_YEAR} latest trailer"
   * If the query mentions a movie/show/album trailer → add "official trailer {CURRENT_YEAR}" and specify the platform (YouTube)
   * Fix typos and hyphenation (e.g. "ice cream-man" → "Ice Cream Man")
-- temporal_intent: true if the query uses words like latest/new/recent/upcoming/current/this year, false otherwise
+- temporal_intent: true if the query uses words like latest/new/recent/upcoming/current/this year, OR a relative date (this weekend, tomorrow, next week, etc.); false otherwise
 
 Return only valid JSON, no markdown:
 {{

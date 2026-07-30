@@ -24,6 +24,7 @@ env/
 *.sqlite
 *.sqlite3
 backend/memory/entity_cache.json
+backend/memory/result_cache.json
 model_evals.json
 uploads/
 .chainlit/

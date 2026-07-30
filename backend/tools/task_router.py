@@ -70,11 +70,24 @@ Return only your direct reply.""", task_type="planning")
             "status": "completed"
         }
 
+    # ── Result cache: reuse a recent completed answer for the same query and skip
+    # the whole browse. Volatile queries (flights/prices/live) use a short TTL. ──
+    from backend.tools import result_cache
+    cached = result_cache.get(query)
+    if cached is not None:
+        print(f"[ResultCache] HIT — returning cached answer for: {query[:60]}")
+        hit = dict(cached)
+        hit["from_cache"] = True
+        return hit
+
     from backend.agents.research.agent import run_research
     res = await run_research(query, task_id=task_id)
 
     from backend.tools.rich_cards import enrich_response
-    return await enrich_response(query, res, task_id)
+    enriched = await enrich_response(query, res, task_id)
+
+    result_cache.put(query, enriched)   # store completed answers for next time
+    return enriched
 
 
 # ── Param parsers ──────────────────────────────────────────────────────────
