@@ -603,6 +603,18 @@ main { flex: 1; overflow: hidden; display: flex; flex-direction: column; positio
 const API = window.location.origin === 'null' ? 'http://localhost:8000' : '';
 marked.setOptions({ gfm: true, breaks: true });
 
+// Render markdown and force every link to open in a new tab (version-agnostic:
+// post-processes the DOM rather than depending on marked's renderer internals).
+function renderMarkdown(md) {
+  const tmp = document.createElement('div');
+  tmp.innerHTML = marked.parse(md || '');
+  tmp.querySelectorAll('a[href]').forEach(a => {
+    a.setAttribute('target', '_blank');
+    a.setAttribute('rel', 'noopener noreferrer');
+  });
+  return tmp.innerHTML;
+}
+
 let busy = false, resumeProfile = null, clarifyTaskId = null;
 let chatHistory = [];
 const MAX_HISTORY = 10;
@@ -1045,7 +1057,7 @@ function addAgentMsg(md, cards) {
       <span style="margin-left:auto;color:var(--text3)">${ts()}</span>
     </div>
     ${cardsHtml}
-    <div class="bubble"><div class="md-content">${marked.parse(md||'')}</div></div>
+    <div class="bubble"><div class="md-content">${renderMarkdown(md||'')}</div></div>
     <div class="msg-actions">
       <button class="act-btn" onclick="copyMsg(this)">Copy</button>
     </div>`;
